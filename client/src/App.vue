@@ -25,7 +25,7 @@
       :log="combatLog"
       :over="combatOver"
       @action="soloAction"
-      @again="openSolo"
+      @again="combatTraining ? openTraining() : openSolo()"
       @close="closeCombat"
     />
 
@@ -48,18 +48,22 @@
       v-if="overlay === 'forge'"
       :character="character"
       @buy="forgeBuy"
+      @customize="customizeCharacter"
       @close="overlay = null"
     />
+
+    <ArcadePanel v-if="overlay === 'arcade'" @close="overlay = null" />
   </template>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { ref, reactive, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 import CharacterCreate from './components/CharacterCreate.vue';
 import HUD from './components/HUD.vue';
 import CombatPanel from './components/CombatPanel.vue';
 import RoomPanel from './components/RoomPanel.vue';
 import ForgePanel from './components/ForgePanel.vue';
+import ArcadePanel from './components/ArcadePanel.vue';
 import { createGameSocket } from './net/socket.js';
 import { createRiftScene } from './three/scene.js';
 
@@ -74,6 +78,7 @@ const leaderboard = ref([]);
 const enemy = ref(null);
 const combatLog = ref([]);
 const combatOver = ref(false);
+const combatTraining = ref(false);
 
 const room = ref(null);
 const roomBusy = ref(false);
@@ -111,7 +116,7 @@ function connectSocket() {
 
   socket.on('welcome', ({ character: c, leaderboard: lb }) => {
     character.value = c;
-    identity = { callsign: c.callsign, class: c.class, model: c.model || identity?.model || 'character-female-a' };
+    identity = { callsign: c.callsign, class: c.class, model: c.model || identity?.model || 'character-female-a', accent: c.accent || identity?.accent, sigil: c.sigil || identity?.sigil, hairColor: c.hairColor || identity?.hairColor, clothingColor: c.clothingColor || identity?.clothingColor };
     localStorage.setItem(IDENTITY_KEY, JSON.stringify(identity));
     leaderboard.value = lb || [];
     createError.value = '';
@@ -149,8 +154,8 @@ function connectSocket() {
   });
 }
 
-function handleCreate({ callsign, cls, model }) {
-  const payload = { callsign, class: cls, model };
+function handleCreate({ callsign, cls, model, accent, sigil, hairColor, clothingColor }) {
+  const payload = { callsign, class: cls, model, accent, sigil, hairColor, clothingColor };
   identity = payload;
   if (connected.value) socket.send('hello', payload);
   else pendingCreate = payload;
@@ -160,17 +165,29 @@ function mountScene() {
   if (!sceneContainer.value || scene) return;
   scene = createRiftScene(sceneContainer.value, {
     onPortalChange: (p) => { activePortal.value = p; },
+    onInteract: (area) => {
+      if (area === 'training') openTraining();
+      if (area === 'arcade') overlay.value = 'arcade';
+    },
   });
-  scene.setLocalPlayer({ callsign: character.value.callsign, cls: character.value.class, model: character.value.model || identity?.model });
+  scene.setLocalPlayer({ ...character.value, cls: character.value.class, model: character.value.model || identity?.model });
   scene.onMove((pos) => socket.send('move', pos));
 }
 
 // ---------- solo rift ----------
 function openSolo() {
+  combatTraining.value = false;
   combatLog.value = [];
   combatOver.value = false;
   overlay.value = 'combat';
   socket.send('enter_solo');
+}
+function openTraining() {
+  combatTraining.value = true;
+  combatLog.value = [];
+  combatOver.value = false;
+  overlay.value = 'combat';
+  socket.send('enter_training');
 }
 function soloAction(action) {
   socket.send('solo_action', { action });
@@ -178,11 +195,19 @@ function soloAction(action) {
 function closeCombat() {
   overlay.value = null;
   enemy.value = null;
+  combatTraining.value = false;
 }
 
 // ---------- forge ----------
 function forgeBuy(kind) {
   socket.send('forge', { kind });
+}
+function customizeCharacter(patch) {
+  character.value = { ...character.value, ...patch };
+  identity = { ...identity, ...patch };
+  localStorage.setItem(IDENTITY_KEY, JSON.stringify(identity));
+  socket.send('customize', patch);
+  scene?.setLocalPlayer({ ...character.value, cls: character.value.class });
 }
 
 // ---------- room ----------
@@ -225,6 +250,12 @@ function toggleLeaderboard() {
 }
 
 onMounted(connectSocket);
+watch(overlay, (value) => scene?.setControlsEnabled(!value));
+watch(() => character.value?.level, (level, previous) => {
+  if (scene && previous !== undefined && level !== previous) {
+    scene.setLocalPlayer({ ...character.value, cls: character.value.class });
+  }
+});
 onBeforeUnmount(() => {
   socket?.close();
   scene?.dispose();

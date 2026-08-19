@@ -19,13 +19,40 @@
           </button>
         </div>
 
+        <div class="custom-grid">
+          <div>
+            <div class="step mono"><b>02</b> TUNE YOUR SIGNAL</div>
+            <div class="swatches" role="radiogroup" aria-label="Signal colour">
+              <button v-for="color in colors" :key="color.value" type="button" class="swatch"
+                :class="{ selected: accent === color.value }" :style="{ '--swatch': color.value }"
+                :aria-label="color.name" :aria-checked="accent === color.value" role="radio" @click="accent = color.value" />
+              <input v-model="accent" class="color-picker" type="color" aria-label="Custom signal paint" />
+            </div>
+          </div>
+          <div>
+            <div class="step mono"><b>04</b> HEAD PAINT</div>
+            <div class="swatches"><button v-for="color in hairColors" :key="color" type="button" class="swatch" :class="{ selected: hairColor === color }" :style="{ '--swatch': color }" aria-label="Head paint" @click="hairColor = color" /><input v-model="hairColor" class="color-picker" type="color" aria-label="Custom head paint" /></div>
+          </div>
+          <div>
+            <div class="step mono"><b>05</b> BODY PAINT</div>
+            <div class="swatches"><button v-for="color in clothingColors" :key="color" type="button" class="swatch" :class="{ selected: clothingColor === color }" :style="{ '--swatch': color }" aria-label="Body paint" @click="clothingColor = color" /><input v-model="clothingColor" class="color-picker" type="color" aria-label="Custom body paint" /></div>
+          </div>
+          <div>
+            <div class="step mono"><b>03</b> CHOOSE YOUR GLYPH</div>
+            <div class="glyphs" role="radiogroup" aria-label="Personal glyph">
+              <button v-for="glyph in glyphs" :key="glyph" type="button" class="glyph mono"
+                :class="{ selected: sigil === glyph }" :aria-checked="sigil === glyph" role="radio" @click="sigil = glyph">{{ glyph }}</button>
+            </div>
+          </div>
+        </div>
+
         <div class="details-grid">
           <div>
-            <div class="step mono"><b>02</b> NAME YOUR SIGNAL</div>
+            <div class="step mono"><b>06</b> NAME YOUR SIGNAL</div>
             <input type="text" v-model="name" maxlength="16" placeholder="CALLSIGN" aria-label="Callsign" @keyup.enter="confirm" />
           </div>
           <div>
-            <div class="step mono"><b>03</b> CHOOSE YOUR PATH</div>
+            <div class="step mono"><b>07</b> CHOOSE YOUR PATH</div>
             <div class="class-grid">
               <button v-for="(c, key) in classes" :key="key" type="button" class="class-card"
                 :class="{ selected: cls === key }" :style="{ '--card-accent': c.color }" @click="cls = key">
@@ -61,10 +88,22 @@ const classes = {
 const name = ref('');
 const cls = ref('');
 const model = ref('character-female-a');
+const accent = ref('#4FE3C1');
+const sigil = ref('IX');
+const hairColor = ref('#2B1A12');
+const clothingColor = ref('#344D7A');
+const colors = [
+  { name: 'Ion mint', value: '#4FE3C1' }, { name: 'Nebula violet', value: '#B26CFF' },
+  { name: 'Solar gold', value: '#F4C868' }, { name: 'Nova coral', value: '#FF6B8A' },
+  { name: 'Void blue', value: '#5A8CFF' }, { name: 'Plasma white', value: '#E9EAF4' },
+];
+const glyphs = ['IX', '∆', 'Ø', 'Ψ', '⌁', '◇'];
+const hairColors = ['#171219', '#2B1A12', '#7B4426', '#D4AA67', '#B8C5D6', '#5B2D80'];
+const clothingColors = ['#23324F', '#344D7A', '#70364D', '#37645A', '#7A6234', '#30323A'];
 
 function confirm() {
   if (!name.value.trim() || !cls.value || !model.value) return;
-  emit('confirm', { callsign: name.value.trim(), cls: cls.value, model: model.value });
+  emit('confirm', { callsign: name.value.trim(), cls: cls.value, model: model.value, accent: accent.value, sigil: sigil.value, hairColor: hairColor.value, clothingColor: clothingColor.value });
 }
 </script>
 
@@ -88,6 +127,13 @@ header p { color:var(--text-dim); font-size:13px; max-width:540px; line-height:1
 .avatar-card:hover { border-color:var(--text-dim); transform:translateY(-2px); }
 .avatar-card.selected { color:var(--accent); border-color:var(--accent); background:linear-gradient(180deg, rgba(79,227,193,.12), rgba(79,227,193,.02)); box-shadow:0 0 18px rgba(79,227,193,.12); }
 .details-grid { display:grid; grid-template-columns:.7fr 1.3fr; gap:24px; margin-top:24px; }
+.custom-grid { display:grid; grid-template-columns:1fr 1fr; gap:24px; margin-top:24px; padding:16px; border:1px solid var(--border-soft); border-radius:10px; background:#080b14aa; }
+.swatches, .glyphs { display:flex; gap:8px; flex-wrap:wrap; }
+.swatch { width:32px; height:32px; padding:0; border:2px solid #151a2a; border-radius:50%; background:var(--swatch); cursor:pointer; box-shadow:0 0 14px color-mix(in srgb, var(--swatch) 30%, transparent); }
+.swatch.selected { outline:2px solid white; outline-offset:2px; }
+.color-picker { width:34px; height:34px; padding:2px; border:1px solid var(--border); border-radius:7px; background:#090b13; cursor:pointer; }
+.glyph { width:36px; height:32px; border:1px solid var(--border); border-radius:6px; background:#090b13; color:var(--text-dim); cursor:pointer; }
+.glyph.selected { border-color:var(--accent); color:var(--accent); background:rgba(79,227,193,.1); }
 .class-grid { display:grid; gap:7px; }
 .class-card { display:flex; justify-content:space-between; text-align:left; align-items:center; width:100%; padding:9px 12px; color:var(--text); border:1px solid var(--border); border-left:3px solid var(--card-accent); background:var(--bg-grid); border-radius:7px; cursor:pointer; }
 .class-card small { display:block; color:var(--text-dim); margin-top:2px; font-size:10px; text-transform:uppercase; }
@@ -96,6 +142,6 @@ header p { color:var(--text-dim); font-size:13px; max-width:540px; line-height:1
 .enter { margin-top:22px; padding:13px; text-transform:uppercase; letter-spacing:.08em; }
 .enter span { margin-left:8px; font-size:17px; }
 .error { color:var(--danger); font-size:11px; margin-top:10px; text-align:center; }
-@media (max-width:760px) { .character-grid { grid-template-columns:repeat(6, 1fr); } .details-grid { grid-template-columns:1fr; } .avatar-card img { height:64px; } }
+@media (max-width:760px) { .character-grid { grid-template-columns:repeat(6, 1fr); } .details-grid, .custom-grid { grid-template-columns:1fr; } .avatar-card img { height:64px; } }
 @media (max-width:420px) { .character-grid { grid-template-columns:repeat(4, 1fr); } }
 </style>
