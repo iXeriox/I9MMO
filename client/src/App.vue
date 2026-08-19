@@ -48,13 +48,14 @@
       v-if="overlay === 'forge'"
       :character="character"
       @buy="forgeBuy"
+      @customize="customizeCharacter"
       @close="overlay = null"
     />
   </template>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, onBeforeUnmount, nextTick } from 'vue';
+import { ref, reactive, onMounted, onBeforeUnmount, nextTick, watch } from 'vue';
 import CharacterCreate from './components/CharacterCreate.vue';
 import HUD from './components/HUD.vue';
 import CombatPanel from './components/CombatPanel.vue';
@@ -111,7 +112,7 @@ function connectSocket() {
 
   socket.on('welcome', ({ character: c, leaderboard: lb }) => {
     character.value = c;
-    identity = { callsign: c.callsign, class: c.class, model: c.model || identity?.model || 'character-female-a' };
+    identity = { callsign: c.callsign, class: c.class, model: c.model || identity?.model || 'character-female-a', accent: c.accent || identity?.accent, sigil: c.sigil || identity?.sigil };
     localStorage.setItem(IDENTITY_KEY, JSON.stringify(identity));
     leaderboard.value = lb || [];
     createError.value = '';
@@ -149,8 +150,8 @@ function connectSocket() {
   });
 }
 
-function handleCreate({ callsign, cls, model }) {
-  const payload = { callsign, class: cls, model };
+function handleCreate({ callsign, cls, model, accent, sigil }) {
+  const payload = { callsign, class: cls, model, accent, sigil };
   identity = payload;
   if (connected.value) socket.send('hello', payload);
   else pendingCreate = payload;
@@ -161,7 +162,7 @@ function mountScene() {
   scene = createRiftScene(sceneContainer.value, {
     onPortalChange: (p) => { activePortal.value = p; },
   });
-  scene.setLocalPlayer({ callsign: character.value.callsign, cls: character.value.class, model: character.value.model || identity?.model });
+  scene.setLocalPlayer({ callsign: character.value.callsign, cls: character.value.class, model: character.value.model || identity?.model, accent: character.value.accent || identity?.accent, sigil: character.value.sigil || identity?.sigil });
   scene.onMove((pos) => socket.send('move', pos));
 }
 
@@ -183,6 +184,13 @@ function closeCombat() {
 // ---------- forge ----------
 function forgeBuy(kind) {
   socket.send('forge', { kind });
+}
+function customizeCharacter(patch) {
+  character.value = { ...character.value, ...patch };
+  identity = { ...identity, ...patch };
+  localStorage.setItem(IDENTITY_KEY, JSON.stringify(identity));
+  socket.send('customize', patch);
+  scene?.setLocalPlayer({ callsign: character.value.callsign, cls: character.value.class, model: character.value.model, accent: character.value.accent, sigil: character.value.sigil });
 }
 
 // ---------- room ----------
@@ -225,6 +233,7 @@ function toggleLeaderboard() {
 }
 
 onMounted(connectSocket);
+watch(overlay, (value) => scene?.setControlsEnabled(!value));
 onBeforeUnmount(() => {
   socket?.close();
   scene?.dispose();

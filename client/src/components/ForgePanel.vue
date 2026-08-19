@@ -12,6 +12,16 @@
         </div>
         <button class="btn btn-primary" :disabled="character.shards < hpCost" @click="$emit('buy','hp')">◈{{ hpCost }}</button>
       </div>
+
+      <div class="mono label identity-label">SIGNAL IDENTITY</div>
+      <div class="identity-row">
+        <button v-for="color in colors" :key="color" class="swatch" :class="{ selected: character.accent === color }"
+          :style="{ '--swatch': color }" :aria-label="`Set signal colour ${color}`" @click="$emit('customize', { accent: color })" />
+      </div>
+      <div class="identity-row">
+        <button v-for="sigil in sigils" :key="sigil" class="btn glyph" :class="{ selected: character.sigil === sigil }"
+          @click="$emit('customize', { sigil })">{{ sigil }}</button>
+      </div>
       <div class="row-card">
         <div>
           <b>+2 ATK</b>
@@ -28,7 +38,9 @@
 <script setup>
 import { computed } from 'vue';
 const props = defineProps({ character: Object });
-defineEmits(['buy', 'close']);
+defineEmits(['buy', 'customize', 'close']);
+const colors = ['#4FE3C1', '#B26CFF', '#F4C868', '#FF6B8A', '#5A8CFF', '#E9EAF4'];
+const sigils = ['IX', '∆', 'Ø', 'Ψ', '⌁', '◇'];
 const hpCost = computed(() => Math.round(15 * Math.pow(1.18, props.character.forgeHpBuys || 0)));
 const atkCost = computed(() => Math.round(20 * Math.pow(1.2, props.character.forgeAtkBuys || 0)));
 </script>
@@ -39,4 +51,9 @@ const atkCost = computed(() => Math.round(20 * Math.pow(1.2, props.character.for
 .label { font-size: 10.5px; color: var(--text-faint); letter-spacing: 0.12em; }
 .row-card { display: flex; justify-content: space-between; align-items: center; background: var(--bg-grid); border: 1px solid var(--border-soft); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
 .sub { font-size: 11px; color: var(--text-dim); margin-top: 2px; }
+.identity-label { margin:16px 0 9px; }
+.identity-row { display:flex; gap:8px; margin-bottom:9px; }
+.swatch { width:30px; height:30px; padding:0; border:2px solid var(--border); border-radius:50%; background:var(--swatch); cursor:pointer; }
+.swatch.selected, .glyph.selected { outline:2px solid var(--accent); outline-offset:2px; }
+.glyph { min-width:36px; padding:6px; }
 </style>

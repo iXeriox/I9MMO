@@ -8,7 +8,7 @@ const CLASS_COLORS = {
   wraithhunter: 0xF4C868,
 };
 
-const KEYS = { w: false, a: false, s: false, d: false };
+const KEYS = { w: false, a: false, s: false, d: false, q: false, e: false };
 const MOVE_SPEED = 6;
 const PORTAL_RADIUS = 3.2;
 
@@ -61,6 +61,47 @@ export function createRiftScene(container, { onPortalChange } = {}) {
 
   rim.position.set(-6, 4, -6);
   scene.add(rim);
+
+  // ---------- deep-space backdrop ----------
+  const starPositions = new Float32Array(1800);
+  for (let i = 0; i < starPositions.length; i += 3) {
+    const radius = 55 + Math.random() * 90;
+    const theta = Math.random() * Math.PI * 2;
+    const y = -10 + Math.random() * 85;
+    starPositions[i] = Math.cos(theta) * radius;
+    starPositions[i + 1] = y;
+    starPositions[i + 2] = Math.sin(theta) * radius;
+  }
+  const starGeometry = new THREE.BufferGeometry();
+  starGeometry.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+  scene.add(new THREE.Points(starGeometry, new THREE.PointsMaterial({ color: 0xbfd7ff, size: 0.22, sizeAttenuation: true })));
+
+  const planet = new THREE.Mesh(
+      new THREE.SphereGeometry(13, 40, 24),
+      new THREE.MeshStandardMaterial({ color: 0x182b50, emissive: 0x071326, roughness: 0.82 })
+  );
+  planet.position.set(-42, 16, -64);
+  scene.add(planet);
+
+  function makeShuttle(index) {
+    const shuttle = new THREE.Group();
+    const hull = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.25, 1.35, 4, 10),
+        new THREE.MeshStandardMaterial({ color: 0xa8b5c8, metalness: 0.8, roughness: 0.25 })
+    );
+    hull.rotation.z = Math.PI / 2;
+    shuttle.add(hull);
+    const wingMaterial = new THREE.MeshStandardMaterial({ color: 0x34425d, metalness: 0.7 });
+    const wing = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.06, 0.7), wingMaterial);
+    shuttle.add(wing);
+    const engine = new THREE.PointLight(index % 2 ? 0xb26cff : 0x4fe3c1, 2.5, 6);
+    engine.position.x = -0.9;
+    shuttle.add(engine);
+    shuttle.userData = { radius: 34 + index * 8, speed: 0.035 + index * 0.008, phase: index * 2.1, height: 9 + index * 5 };
+    scene.add(shuttle);
+    return shuttle;
+  }
+  const shuttles = [0, 1, 2, 3].map(makeShuttle);
 
   // ---------- ground ----------
 
@@ -312,7 +353,8 @@ export function createRiftScene(container, { onPortalChange } = {}) {
   function makeAvatar(
       colorHex,
       nameLabel,
-      model
+      model,
+      sigil = 'IX'
   ) {
     const group =
         new THREE.Group();
@@ -339,6 +381,12 @@ export function createRiftScene(container, { onPortalChange } = {}) {
         0.035;
 
     group.add(signal);
+
+    const personalMark = makeLabel(sigil);
+    personalMark.position.set(0, 1.8, -0.35);
+    personalMark.scale.set(0.7, 0.3, 1);
+    personalMark.material.color.set(colorHex);
+    group.add(personalMark);
 
     group.userData.motion =
         'idle';
@@ -557,6 +605,8 @@ export function createRiftScene(container, { onPortalChange } = {}) {
                             callsign,
                             cls,
                             model,
+                            accent,
+                            sigil,
                           }) {
     if (localAvatar) {
       scene.remove(
@@ -564,15 +614,14 @@ export function createRiftScene(container, { onPortalChange } = {}) {
       );
     }
 
-    localColor =
-        CLASS_COLORS[cls] ||
-        0x4fe3c1;
+    localColor = new THREE.Color(accent || CLASS_COLORS[cls] || 0x4fe3c1).getHex();
 
     localAvatar =
         makeAvatar(
             localColor,
             callsign,
-            model
+            model,
+            sigil
         );
 
     scene.add(
@@ -612,10 +661,10 @@ export function createRiftScene(container, { onPortalChange } = {}) {
       if (!entry) {
         const group =
             makeAvatar(
-                CLASS_COLORS[p.class] ||
-                0xffffff,
+                new THREE.Color(p.accent || CLASS_COLORS[p.class] || 0xffffff).getHex(),
                 p.callsign,
-                p.model
+                p.model,
+                p.sigil
             );
 
         scene.add(group);
@@ -734,6 +783,45 @@ export function createRiftScene(container, { onPortalChange } = {}) {
       onKeyUp
   );
 
+  let controlsEnabled = true;
+  let dragging = false;
+  let lastPointerX = 0;
+  let cameraYaw = 0;
+  let cameraPitch = 0.52;
+  let cameraDistance = 10;
+
+  function onPointerDown(event) {
+    if (!controlsEnabled || event.button !== 0) return;
+    dragging = true;
+    lastPointerX = event.clientX;
+    renderer.domElement.style.cursor = 'grabbing';
+  }
+  function onPointerMove(event) {
+    if (!dragging || !controlsEnabled) return;
+    cameraYaw -= (event.clientX - lastPointerX) * 0.006;
+    cameraPitch = THREE.MathUtils.clamp(cameraPitch - event.movementY * 0.004, 0.22, 1.05);
+    lastPointerX = event.clientX;
+  }
+  function onPointerUp() {
+    dragging = false;
+    renderer.domElement.style.cursor = controlsEnabled ? 'grab' : 'default';
+  }
+  function onWheel(event) {
+    if (!controlsEnabled) return;
+    cameraDistance = THREE.MathUtils.clamp(cameraDistance + event.deltaY * 0.01, 6, 16);
+  }
+  renderer.domElement.style.cursor = 'grab';
+  renderer.domElement.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', onPointerUp);
+  renderer.domElement.addEventListener('wheel', onWheel, { passive: true });
+
+  function setControlsEnabled(enabled) {
+    controlsEnabled = enabled;
+    if (!enabled) onPointerUp();
+    renderer.domElement.style.cursor = enabled ? 'grab' : 'default';
+  }
+
   // ---------- resize ----------
 
   function onResize() {
@@ -849,6 +937,13 @@ export function createRiftScene(container, { onPortalChange } = {}) {
           t * 0.6;
     }
 
+    shuttles.forEach((shuttle) => {
+      const flight = shuttle.userData;
+      const angle = t * flight.speed + flight.phase;
+      shuttle.position.set(Math.cos(angle) * flight.radius, flight.height + Math.sin(angle * 2) * 2, Math.sin(angle) * flight.radius - 18);
+      shuttle.rotation.y = -angle;
+    });
+
     if (localAvatar) {
       let dx = 0;
       let dz = 0;
@@ -871,11 +966,13 @@ export function createRiftScene(container, { onPortalChange } = {}) {
 
       const forwardInput =
           Number(KEYS.w) -
-          Number(KEYS.s);
+          Number(KEYS.s) +
+          0.707 * (Number(KEYS.q) + Number(KEYS.e));
 
       const rightInput =
           Number(KEYS.d) -
-          Number(KEYS.a);
+          Number(KEYS.a) +
+          0.707 * (Number(KEYS.e) - Number(KEYS.q));
 
       dx =
           forward.x *
@@ -1003,20 +1100,12 @@ export function createRiftScene(container, { onPortalChange } = {}) {
 
       checkPortals();
 
-      const camTarget =
-          new THREE.Vector3(
-              local.x -
-              Math.sin(
-                  local.rotY
-              ) *
-              8,
-              6,
-              local.z -
-              Math.cos(
-                  local.rotY
-              ) *
-              8
-          );
+      const horizontalDistance = Math.cos(cameraPitch) * cameraDistance;
+      const camTarget = new THREE.Vector3(
+          local.x + Math.sin(cameraYaw) * horizontalDistance,
+          1.2 + Math.sin(cameraPitch) * cameraDistance,
+          local.z + Math.cos(cameraYaw) * horizontalDistance
+      );
 
       camera.position.lerp(
           camTarget,
@@ -1103,9 +1192,13 @@ export function createRiftScene(container, { onPortalChange } = {}) {
     );
 
     window.removeEventListener(
-        'resize',
-        onResize
+      'resize',
+      onResize
     );
+    renderer.domElement.removeEventListener('pointerdown', onPointerDown);
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', onPointerUp);
+    renderer.domElement.removeEventListener('wheel', onWheel);
 
     renderer.dispose();
 
@@ -1123,6 +1216,7 @@ export function createRiftScene(container, { onPortalChange } = {}) {
     setLocalPlayer,
     syncRemotePlayers,
     onMove,
+    setControlsEnabled,
     dispose,
   };
 }
