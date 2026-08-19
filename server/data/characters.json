@@ -1,30 +1,17 @@
 {
-  "Leo": {
-    "callsign": "Leo",
+  "iXeri": {
+    "callsign": "iXeri",
     "class": "phasecaller",
-    "level": 4,
-    "xp": 177,
-    "xpToNext": 343,
-    "maxHp": 124,
-    "hp": 0,
-    "atk": 25,
-    "shards": 201,
-    "abilityCooldown": 3,
-    "forgeHpBuys": 0,
-    "forgeAtkBuys": 0
-  },
-  "Kitsune": {
-    "callsign": "Kitsune",
-    "class": "phasecaller",
-    "level": 5,
-    "xp": 150,
-    "xpToNext": 485,
-    "maxHp": 136,
-    "hp": 0,
-    "atk": 27,
-    "shards": 253,
-    "abilityCooldown": 3,
-    "forgeHpBuys": 0,
-    "forgeAtkBuys": 0
+    "model": "character-male-c",
+    "level": 105,
+    "xp": 2421,
+    "xpToNext": 54313,
+    "maxHp": 3160140,
+    "hp": 3160140,
+    "atk": 1051,
+    "shards": 33227,
+    "abilityCooldown": 0,
+    "forgeHpBuys": 20,
+    "forgeAtkBuys": 31
   }
 }
