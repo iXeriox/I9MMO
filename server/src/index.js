@@ -269,8 +269,10 @@ wss.on('connection', (ws) => {
         case 'customize': {
           if (!conn.character) return;
           const accent = String(msg.payload?.accent || '');
+          const model = String(msg.payload?.model || '');
           const allowedSigils = ['IX', '∆', 'Ø', 'Ψ', '⌁', '◇'];
           if (/^#[0-9A-Fa-f]{6}$/.test(accent)) conn.character.accent = accent;
+          if (/^character-(female|male)-[a-f]$/.test(model)) conn.character.model = model;
           if (allowedSigils.includes(msg.payload?.sigil)) conn.character.sigil = msg.payload.sigil;
           if (/^#[0-9A-Fa-f]{6}$/.test(String(msg.payload?.hairColor || ''))) conn.character.hairColor = msg.payload.hairColor;
           if (/^#[0-9A-Fa-f]{6}$/.test(String(msg.payload?.clothingColor || ''))) conn.character.clothingColor = msg.payload.clothingColor;

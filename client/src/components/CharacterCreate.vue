@@ -26,15 +26,16 @@
               <button v-for="color in colors" :key="color.value" type="button" class="swatch"
                 :class="{ selected: accent === color.value }" :style="{ '--swatch': color.value }"
                 :aria-label="color.name" :aria-checked="accent === color.value" role="radio" @click="accent = color.value" />
+              <input v-model="accent" class="color-picker" type="color" aria-label="Custom signal paint" />
             </div>
           </div>
           <div>
-            <div class="step mono"><b>04</b> HAIR COLOR</div>
-            <div class="swatches"><button v-for="color in hairColors" :key="color" type="button" class="swatch" :class="{ selected: hairColor === color }" :style="{ '--swatch': color }" aria-label="Hair color" @click="hairColor = color" /></div>
+            <div class="step mono"><b>04</b> HEAD PAINT</div>
+            <div class="swatches"><button v-for="color in hairColors" :key="color" type="button" class="swatch" :class="{ selected: hairColor === color }" :style="{ '--swatch': color }" aria-label="Head paint" @click="hairColor = color" /><input v-model="hairColor" class="color-picker" type="color" aria-label="Custom head paint" /></div>
           </div>
           <div>
-            <div class="step mono"><b>05</b> CLOTHING COLOR</div>
-            <div class="swatches"><button v-for="color in clothingColors" :key="color" type="button" class="swatch" :class="{ selected: clothingColor === color }" :style="{ '--swatch': color }" aria-label="Clothing color" @click="clothingColor = color" /></div>
+            <div class="step mono"><b>05</b> BODY PAINT</div>
+            <div class="swatches"><button v-for="color in clothingColors" :key="color" type="button" class="swatch" :class="{ selected: clothingColor === color }" :style="{ '--swatch': color }" aria-label="Body paint" @click="clothingColor = color" /><input v-model="clothingColor" class="color-picker" type="color" aria-label="Custom body paint" /></div>
           </div>
           <div>
             <div class="step mono"><b>03</b> CHOOSE YOUR GLYPH</div>
@@ -130,6 +131,7 @@ header p { color:var(--text-dim); font-size:13px; max-width:540px; line-height:1
 .swatches, .glyphs { display:flex; gap:8px; flex-wrap:wrap; }
 .swatch { width:32px; height:32px; padding:0; border:2px solid #151a2a; border-radius:50%; background:var(--swatch); cursor:pointer; box-shadow:0 0 14px color-mix(in srgb, var(--swatch) 30%, transparent); }
 .swatch.selected { outline:2px solid white; outline-offset:2px; }
+.color-picker { width:34px; height:34px; padding:2px; border:1px solid var(--border); border-radius:7px; background:#090b13; cursor:pointer; }
 .glyph { width:36px; height:32px; border:1px solid var(--border); border-radius:6px; background:#090b13; color:var(--text-dim); cursor:pointer; }
 .glyph.selected { border-color:var(--accent); color:var(--accent); background:rgba(79,227,193,.1); }
 .class-grid { display:grid; gap:7px; }

@@ -381,7 +381,8 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
       model,
       sigil = 'IX',
       hairColor = '#2B1A12',
-      clothingColor = '#344D7A'
+      clothingColor = '#344D7A',
+      level = 1
   ) {
     const group =
         new THREE.Group();
@@ -415,20 +416,6 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
     personalMark.material.color.set(colorHex);
     group.add(personalMark);
 
-    const outfit = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.42, 0.5, 0.78, 8),
-        new THREE.MeshStandardMaterial({ color: clothingColor, metalness: 0.35, roughness: 0.48 })
-    );
-    outfit.position.y = 1.05;
-    outfit.scale.z = 0.62;
-    group.add(outfit);
-    const hair = new THREE.Mesh(
-        new THREE.SphereGeometry(0.34, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62),
-        new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.8 })
-    );
-    hair.position.set(0, 1.78, 0);
-    group.add(hair);
-
     group.userData.motion =
         'idle';
 
@@ -448,6 +435,17 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
                 if (
                     object.isMesh
                 ) {
+                  const isHead = object.name.toLowerCase().includes('head');
+                  const paint = new THREE.Color(isHead ? hairColor : clothingColor);
+                  const materials = Array.isArray(object.material) ? object.material : [object.material];
+                  const painted = materials.map((material) => {
+                    const clone = material.clone();
+                    clone.color.copy(paint);
+                    clone.metalness = isHead ? 0.05 : 0.28;
+                    clone.roughness = isHead ? 0.72 : 0.46;
+                    return clone;
+                  });
+                  object.material = Array.isArray(object.material) ? painted : painted[0];
                   object.castShadow =
                       true;
 
@@ -512,11 +510,14 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
         );
 
     if (nameLabel) {
-      group.add(
-          makeLabel(
-              nameLabel
-          )
-      );
+      const name = makeLabel(nameLabel);
+      name.position.y = 2.72;
+      group.add(name);
+      const levelLabel = makeLabel(`LV ${level}`);
+      levelLabel.position.y = 2.36;
+      levelLabel.scale.set(1.15, 0.3, 1);
+      levelLabel.material.color.set(0x8b90ac);
+      group.add(levelLabel);
     }
 
     return group;
@@ -653,6 +654,7 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
                             sigil,
                             hairColor,
                             clothingColor,
+                            level,
                           }) {
     if (localAvatar) {
       scene.remove(
@@ -669,7 +671,8 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
             model,
             sigil,
             hairColor,
-            clothingColor
+            clothingColor,
+            level
         );
 
     scene.add(
@@ -706,6 +709,13 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
               p.callsign
           );
 
+      const styleKey = [p.model, p.accent, p.sigil, p.hairColor, p.clothingColor, p.level].join('|');
+      if (entry && entry.styleKey !== styleKey) {
+        scene.remove(entry.group);
+        remotes.delete(p.callsign);
+        entry = null;
+      }
+
       if (!entry) {
         const group =
             makeAvatar(
@@ -714,7 +724,8 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
                 p.model,
                 p.sigil,
                 p.hairColor,
-                p.clothingColor
+                p.clothingColor,
+                p.level
             );
 
         scene.add(group);
@@ -740,6 +751,7 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
 
           movingUntil:
               0,
+          styleKey,
         };
 
         remotes.set(

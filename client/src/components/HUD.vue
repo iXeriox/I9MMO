@@ -52,7 +52,7 @@
     </div>
 
     <!-- movement hint -->
-    <div class="hint mono">WASD move · Q / E diagonal · SPACE jump · mouse orbit · F interact</div>
+    <div class="hint mono">WASD move · SPACE jump · mouse orbit · F interact</div>
 
     <!-- chat -->
     <div class="chat panel">

@@ -251,6 +251,11 @@ function toggleLeaderboard() {
 
 onMounted(connectSocket);
 watch(overlay, (value) => scene?.setControlsEnabled(!value));
+watch(() => character.value?.level, (level, previous) => {
+  if (scene && previous !== undefined && level !== previous) {
+    scene.setLocalPlayer({ ...character.value, cls: character.value.class });
+  }
+});
 onBeforeUnmount(() => {
   socket?.close();
   scene?.dispose();
