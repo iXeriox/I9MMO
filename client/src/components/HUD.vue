@@ -52,7 +52,7 @@
     </div>
 
     <!-- movement hint -->
-    <div class="hint mono">WASD to move · walk into a ring to interact</div>
+    <div class="hint mono">WASD move · Q / E diagonal · drag mouse to orbit · scroll to zoom</div>
 
     <!-- chat -->
     <div class="chat panel">

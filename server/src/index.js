@@ -84,6 +84,8 @@ function worldSnapshot() {
       callsign: c.callsign,
       class: c.character.class,
       model: c.character.model,
+      accent: c.character.accent,
+      sigil: c.character.sigil,
       level: c.character.level,
       x: c.x || 0,
       z: c.z || 0,
@@ -117,17 +119,24 @@ wss.on('connection', (ws) => {
           const cls = msg.payload?.class;
           const requestedModel = String(msg.payload?.model || 'character-female-a');
           const model = /^character-(female|male)-[a-f]$/.test(requestedModel) ? requestedModel : 'character-female-a';
+          const requestedAccent = String(msg.payload?.accent || '#4FE3C1');
+          const accent = /^#[0-9A-Fa-f]{6}$/.test(requestedAccent) ? requestedAccent : '#4FE3C1';
+          const allowedSigils = ['IX', '∆', 'Ø', 'Ψ', '⌁', '◇'];
+          const sigil = allowedSigils.includes(msg.payload?.sigil) ? msg.payload.sigil : 'IX';
           if (!callsign || !CLASSES[cls] && !getCharacter(callsign)) {
             return send(ws, 'error', { message: 'Invalid callsign or class.' });
           }
           let character = getCharacter(callsign);
           if (!character) {
-            character = newCharacter(callsign, cls, model);
+            character = newCharacter(callsign, cls, model, accent, sigil);
             saveCharacter(character);
           } else if (!character.model) {
             character.model = model;
             saveCharacter(character);
           }
+          if (!character.accent) character.accent = accent;
+          if (!character.sigil) character.sigil = sigil;
+          saveCharacter(character);
           conn.callsign = callsign;
           conn.character = character;
           send(ws, 'welcome', { character, leaderboard: leaderboard() });
@@ -229,6 +238,17 @@ wss.on('connection', (ws) => {
           }
           saveCharacter(character);
           send(ws, 'character_state', { character });
+          break;
+        }
+
+        case 'customize': {
+          if (!conn.character) return;
+          const accent = String(msg.payload?.accent || '');
+          const allowedSigils = ['IX', '∆', 'Ø', 'Ψ', '⌁', '◇'];
+          if (/^#[0-9A-Fa-f]{6}$/.test(accent)) conn.character.accent = accent;
+          if (allowedSigils.includes(msg.payload?.sigil)) conn.character.sigil = msg.payload.sigil;
+          saveCharacter(conn.character);
+          send(ws, 'character_state', { character: conn.character });
           break;
         }
 
