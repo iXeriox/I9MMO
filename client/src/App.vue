@@ -85,16 +85,34 @@ let cooldownTimer = null;
 const sceneContainer = ref(null);
 let scene = null;
 let socket = null;
-let pendingCreate = null;
+const IDENTITY_KEY = 'infini9.identity.v1';
+let identity = loadIdentity();
+let pendingCreate = identity;
+
+function loadIdentity() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(IDENTITY_KEY));
+    return saved?.callsign && saved?.class ? saved : null;
+  } catch {
+    return null;
+  }
+}
 
 function connectSocket() {
   socket = createGameSocket();
 
-  socket.on('_open', () => { connected.value = true; if (pendingCreate) { socket.send('hello', pendingCreate); pendingCreate = null; } });
+  socket.on('_open', () => {
+    connected.value = true;
+    const login = pendingCreate || identity;
+    if (login) socket.send('hello', login);
+    pendingCreate = null;
+  });
   socket.on('_close', () => { connected.value = false; });
 
   socket.on('welcome', ({ character: c, leaderboard: lb }) => {
     character.value = c;
+    identity = { callsign: c.callsign, class: c.class, model: c.model || identity?.model || 'character-female-a' };
+    localStorage.setItem(IDENTITY_KEY, JSON.stringify(identity));
     leaderboard.value = lb || [];
     createError.value = '';
     nextTick(mountScene);
@@ -131,8 +149,9 @@ function connectSocket() {
   });
 }
 
-function handleCreate({ callsign, cls }) {
-  const payload = { callsign, class: cls };
+function handleCreate({ callsign, cls, model }) {
+  const payload = { callsign, class: cls, model };
+  identity = payload;
   if (connected.value) socket.send('hello', payload);
   else pendingCreate = payload;
 }
@@ -142,7 +161,7 @@ function mountScene() {
   scene = createRiftScene(sceneContainer.value, {
     onPortalChange: (p) => { activePortal.value = p; },
   });
-  scene.setLocalPlayer({ callsign: character.value.callsign, cls: character.value.class });
+  scene.setLocalPlayer({ callsign: character.value.callsign, cls: character.value.class, model: character.value.model || identity?.model });
   scene.onMove((pos) => socket.send('move', pos));
 }
 

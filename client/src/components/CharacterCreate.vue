@@ -1,79 +1,101 @@
 <template>
   <div class="wrap">
-    <div class="panel" style="max-width: 560px; margin: 8vh auto;">
-      <div style="text-align:center; margin-bottom: 6px;">
-        <div class="display" style="font-size: 22px; font-weight:700;">INFINI<span style="color:var(--accent)">9</span></div>
-        <div class="mono" style="font-size:10.5px; color:var(--text-faint); letter-spacing:0.12em;">RIFT NETWORK</div>
-      </div>
-      <p style="text-align:center; color:var(--text-dim); font-size:13px; max-width:420px; margin:14px auto 22px;">
-        Nine rifts have torn open across Infini9. Pick a callsign and a class to step through.
-      </p>
+    <div class="scanlines"></div>
+    <main class="creator">
+      <header>
+        <div class="eyebrow mono">IDENTITY UPLINK // FIRST LAUNCH</div>
+        <div class="display logo">INFINI<span>9</span></div>
+        <p>Choose the signal you will carry between the nine. Your identity and progress will be remembered on this device.</p>
+      </header>
 
-      <div class="bar-row">
-        <div class="bar-label"><span>CALLSIGN</span></div>
-        <input type="text" v-model="name" maxlength="16" placeholder="e.g. Ashvane, Kite-9, Null_Rae" @keyup.enter="confirm" />
-      </div>
-
-      <div class="mono" style="font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.1em; margin: 18px 0 10px;">Choose a class</div>
-      <div class="class-grid">
-        <div v-for="(c, key) in classes" :key="key"
-             class="class-card" :class="{ selected: cls === key }"
-             :style="{ '--card-accent': c.color }"
-             @click="cls = key">
-          <h3 style="font-size:16px;">{{ c.name }}</h3>
-          <div class="role">{{ c.role }}</div>
-          <div class="stats mono">HP {{ c.baseHp }} &nbsp; ATK {{ c.baseAtk }}</div>
-          <div class="ability"><b>{{ c.abilityName }}</b></div>
+      <section class="panel identity-panel">
+        <div class="step mono"><b>01</b> SELECT YOUR VESSEL</div>
+        <div class="character-grid" role="radiogroup" aria-label="Character appearance">
+          <button v-for="avatar in avatars" :key="avatar.id" type="button" class="avatar-card"
+            :class="{ selected: model === avatar.id }" :aria-checked="model === avatar.id" role="radio"
+            @click="model = avatar.id">
+            <img :src="`/assets/characters/previews/${avatar.id}.png`" :alt="avatar.label" />
+            <span class="mono">{{ avatar.label }}</span>
+          </button>
         </div>
-      </div>
 
-      <button class="btn btn-primary btn-block" style="margin-top:20px;" :disabled="!name.trim() || !cls" @click="confirm">
-        Step Through the Rift →
-      </button>
-      <div v-if="error" class="mono" style="color:var(--danger); font-size:12px; margin-top:10px; text-align:center;">{{ error }}</div>
-    </div>
+        <div class="details-grid">
+          <div>
+            <div class="step mono"><b>02</b> NAME YOUR SIGNAL</div>
+            <input type="text" v-model="name" maxlength="16" placeholder="CALLSIGN" aria-label="Callsign" @keyup.enter="confirm" />
+          </div>
+          <div>
+            <div class="step mono"><b>03</b> CHOOSE YOUR PATH</div>
+            <div class="class-grid">
+              <button v-for="(c, key) in classes" :key="key" type="button" class="class-card"
+                :class="{ selected: cls === key }" :style="{ '--card-accent': c.color }" @click="cls = key">
+                <span><b>{{ c.name }}</b><small>{{ c.role }}</small></span>
+                <span class="mono stats">{{ c.baseHp }} HP<br>{{ c.baseAtk }} ATK</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn btn-primary btn-block enter" :disabled="!name.trim() || !cls || !model" @click="confirm">
+          Bind identity &amp; enter the rift <span>→</span>
+        </button>
+        <div v-if="error" class="error mono">{{ error }}</div>
+      </section>
+    </main>
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue';
 
-const props = defineProps({ error: { type: String, default: '' } });
+defineProps({ error: { type: String, default: '' } });
 const emit = defineEmits(['confirm']);
 
+const avatars = ['female-a', 'female-b', 'female-c', 'female-d', 'female-e', 'female-f', 'male-a', 'male-b', 'male-c', 'male-d', 'male-e', 'male-f']
+  .map((name, i) => ({ id: `character-${name}`, label: `Vessel ${String(i + 1).padStart(2, '0')}` }));
 const classes = {
-  vanguard: { name: 'Vanguard', role: 'Tank / Melee', baseHp: 140, baseAtk: 11, abilityName: 'Bulwark Smash', color: '#B26CFF' },
-  phasecaller: { name: 'Phasecaller', role: 'Arcane DPS', baseHp: 88, baseAtk: 19, abilityName: 'Rift Bolt', color: '#4FE3C1' },
-  wraithhunter: { name: 'Wraithhunter', role: 'Ranged Rogue', baseHp: 104, baseAtk: 15, abilityName: 'Twin Strike', color: '#F4C868' },
+  vanguard: { name: 'Vanguard', role: 'Tank / Melee', baseHp: 140, baseAtk: 11, color: '#B26CFF' },
+  phasecaller: { name: 'Phasecaller', role: 'Arcane DPS', baseHp: 88, baseAtk: 19, color: '#4FE3C1' },
+  wraithhunter: { name: 'Wraithhunter', role: 'Ranged Rogue', baseHp: 104, baseAtk: 15, color: '#F4C868' },
 };
-
 const name = ref('');
 const cls = ref('');
+const model = ref('character-female-a');
 
 function confirm() {
-  if (!name.value.trim() || !cls.value) return;
-  emit('confirm', { callsign: name.value.trim(), cls: cls.value });
+  if (!name.value.trim() || !cls.value || !model.value) return;
+  emit('confirm', { callsign: name.value.trim(), cls: cls.value, model: model.value });
 }
 </script>
 
 <style scoped>
-.wrap { position: fixed; inset: 0; overflow-y: auto; padding: 20px; }
-.class-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
-.class-card {
-  background: var(--bg-grid);
-  border: 1.5px solid var(--border);
-  border-radius: 12px;
-  padding: 14px;
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-.class-card:hover { border-color: var(--text-dim); }
-.class-card.selected {
-  border-color: var(--card-accent, var(--accent));
-  background: linear-gradient(180deg, rgba(79,227,193,0.06), transparent);
-}
-.role { font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--card-accent, var(--accent)); text-transform: uppercase; letter-spacing: 0.06em; margin: 2px 0 8px; }
-.stats { font-size: 11px; color: var(--text-dim); margin-bottom: 8px; }
-.ability { font-size: 12px; color: var(--text-dim); }
-.ability b { color: var(--text); }
+.wrap { position: fixed; inset: 0; overflow-y: auto; padding: 42px 20px; background: radial-gradient(circle at 50% 0%, #17263a 0, #090b14 38%, #05060a 100%); }
+.wrap::before { content:''; position:fixed; inset:0; opacity:.2; pointer-events:none; background-image: linear-gradient(rgba(79,227,193,.15) 1px, transparent 1px), linear-gradient(90deg, rgba(79,227,193,.15) 1px, transparent 1px); background-size:48px 48px; mask-image:linear-gradient(to bottom, black, transparent 70%); }
+.scanlines { position:fixed; inset:0; pointer-events:none; opacity:.08; background:repeating-linear-gradient(0deg, transparent 0 3px, #fff 4px); }
+.creator { position:relative; width:min(940px, 100%); margin:auto; }
+header { text-align:center; margin-bottom:24px; }
+.eyebrow, .step { color:var(--accent); font-size:10px; letter-spacing:.2em; }
+.logo { font-size:clamp(42px, 8vw, 72px); font-weight:700; line-height:1; letter-spacing:-.06em; margin:8px 0 10px; text-shadow:0 0 35px rgba(79,227,193,.18); }
+.logo span { color:var(--accent); }
+header p { color:var(--text-dim); font-size:13px; max-width:540px; line-height:1.6; margin:auto; }
+.identity-panel { padding:22px; box-shadow:0 30px 90px #0009, inset 0 1px rgba(255,255,255,.03); }
+.step { margin-bottom:12px; color:var(--text-dim); }
+.step b { color:var(--accent); margin-right:8px; }
+.character-grid { display:grid; grid-template-columns:repeat(12, 1fr); gap:6px; }
+.avatar-card { min-width:0; padding:8px 3px 6px; border:1px solid var(--border); border-radius:8px; background:#090b13; color:var(--text-faint); cursor:pointer; transition:.18s ease; }
+.avatar-card img { width:100%; height:82px; object-fit:contain; image-rendering:auto; filter:saturate(.8); }
+.avatar-card span { display:block; font-size:7px; letter-spacing:.05em; white-space:nowrap; }
+.avatar-card:hover { border-color:var(--text-dim); transform:translateY(-2px); }
+.avatar-card.selected { color:var(--accent); border-color:var(--accent); background:linear-gradient(180deg, rgba(79,227,193,.12), rgba(79,227,193,.02)); box-shadow:0 0 18px rgba(79,227,193,.12); }
+.details-grid { display:grid; grid-template-columns:.7fr 1.3fr; gap:24px; margin-top:24px; }
+.class-grid { display:grid; gap:7px; }
+.class-card { display:flex; justify-content:space-between; text-align:left; align-items:center; width:100%; padding:9px 12px; color:var(--text); border:1px solid var(--border); border-left:3px solid var(--card-accent); background:var(--bg-grid); border-radius:7px; cursor:pointer; }
+.class-card small { display:block; color:var(--text-dim); margin-top:2px; font-size:10px; text-transform:uppercase; }
+.class-card .stats { color:var(--text-faint); text-align:right; font-size:9px; line-height:1.5; }
+.class-card.selected { border-color:var(--card-accent); background:color-mix(in srgb, var(--card-accent) 10%, var(--bg-grid)); }
+.enter { margin-top:22px; padding:13px; text-transform:uppercase; letter-spacing:.08em; }
+.enter span { margin-left:8px; font-size:17px; }
+.error { color:var(--danger); font-size:11px; margin-top:10px; text-align:center; }
+@media (max-width:760px) { .character-grid { grid-template-columns:repeat(6, 1fr); } .details-grid { grid-template-columns:1fr; } .avatar-card img { height:64px; } }
+@media (max-width:420px) { .character-grid { grid-template-columns:repeat(4, 1fr); } }
 </style>

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const CLASS_COLORS = {
   vanguard: 0xB26CFF,
@@ -21,6 +22,9 @@ export function createRiftScene(container, { onPortalChange } = {}) {
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(container.clientWidth, container.clientHeight);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.15;
   container.appendChild(renderer.domElement);
 
   // ---------- lighting ----------
@@ -42,6 +46,36 @@ export function createRiftScene(container, { onPortalChange } = {}) {
   const grid = new THREE.GridHelper(60, 60, 0x272b41, 0x1a1d2e);
   grid.position.y = 0.01;
   scene.add(grid);
+
+  // ---------- Infini9 spawn dais ----------
+  const dais = new THREE.Mesh(
+    new THREE.CylinderGeometry(5.2, 5.5, 0.35, 9),
+    new THREE.MeshStandardMaterial({ color: 0x11172a, metalness: 0.65, roughness: 0.35 })
+  );
+  dais.position.y = -0.12;
+  scene.add(dais);
+  const nineRing = new THREE.Mesh(
+    new THREE.TorusGeometry(3.25, 0.055, 8, 72),
+    new THREE.MeshBasicMaterial({ color: 0x4fe3c1, transparent: true, opacity: 0.75 })
+  );
+  nineRing.rotation.x = Math.PI / 2;
+  nineRing.position.y = 0.075;
+  scene.add(nineRing);
+  const nodeGeometry = new THREE.OctahedronGeometry(0.13);
+  const nodeMaterial = new THREE.MeshBasicMaterial({ color: 0xb26cff });
+  for (let i = 0; i < 9; i++) {
+    const angle = (i / 9) * Math.PI * 2;
+    const node = new THREE.Mesh(nodeGeometry, nodeMaterial);
+    node.position.set(Math.sin(angle) * 3.25, 0.15, Math.cos(angle) * 3.25);
+    scene.add(node);
+  }
+  const mark = makeLabel('∞ 9');
+  mark.position.set(0, 0.12, -0.15);
+  mark.scale.set(2.4, 0.6, 1);
+  mark.material.opacity = 0.48;
+  mark.material.depthTest = true;
+  mark.rotation.x = -Math.PI / 2;
+  scene.add(mark);
 
   // ---------- portals ----------
   function makePortal(color, x, z) {
@@ -71,19 +105,32 @@ export function createRiftScene(container, { onPortalChange } = {}) {
   };
 
   // ---------- local avatar ----------
-  function makeAvatar(colorHex, nameLabel) {
-    const group = new THREE.Group();
-    const bodyGeo = new THREE.CapsuleGeometry(0.45, 1.0, 4, 12);
-    const bodyMat = new THREE.MeshStandardMaterial({ color: colorHex, roughness: 0.5, metalness: 0.15 });
-    const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.position.y = 1.0;
-    group.add(body);
+  const loader = new GLTFLoader();
+  const modelCache = new Map();
 
-    const glowGeo = new THREE.SphereGeometry(0.18, 12, 12);
-    const glowMat = new THREE.MeshBasicMaterial({ color: colorHex });
-    const glow = new THREE.Mesh(glowGeo, glowMat);
-    glow.position.y = 1.85;
-    group.add(glow);
+  function loadCharacter(model) {
+    const safeModel = /^character-(female|male)-[a-f]$/.test(model || '') ? model : 'character-female-a';
+    if (!modelCache.has(safeModel)) {
+      modelCache.set(safeModel, loader.loadAsync(`/assets/characters/${safeModel}.glb`).then((gltf) => gltf.scene));
+    }
+    return modelCache.get(safeModel);
+  }
+
+  function makeAvatar(colorHex, nameLabel, model) {
+    const group = new THREE.Group();
+    const signal = new THREE.Mesh(
+      new THREE.RingGeometry(0.52, 0.62, 24),
+      new THREE.MeshBasicMaterial({ color: colorHex, transparent: true, opacity: 0.5, side: THREE.DoubleSide })
+    );
+    signal.rotation.x = -Math.PI / 2;
+    signal.position.y = 0.035;
+    group.add(signal);
+
+    loadCharacter(model).then((source) => {
+      const body = source.clone(true);
+      body.traverse((object) => { if (object.isMesh) { object.castShadow = true; object.receiveShadow = true; } });
+      group.add(body);
+    }).catch((error) => console.error('[scene] unable to load character model', error));
 
     if (nameLabel) group.add(makeLabel(nameLabel));
     return group;
@@ -110,10 +157,10 @@ export function createRiftScene(container, { onPortalChange } = {}) {
   const local = { x: 0, z: 0, rotY: 0 };
   let activePortal = null;
 
-  function setLocalPlayer({ callsign, cls }) {
+  function setLocalPlayer({ callsign, cls, model }) {
     if (localAvatar) scene.remove(localAvatar);
     localColor = CLASS_COLORS[cls] || 0x4fe3c1;
-    localAvatar = makeAvatar(localColor, callsign);
+    localAvatar = makeAvatar(localColor, callsign, model);
     scene.add(localAvatar);
   }
 
@@ -127,7 +174,7 @@ export function createRiftScene(container, { onPortalChange } = {}) {
       seen.add(p.callsign);
       let entry = remotes.get(p.callsign);
       if (!entry) {
-        const group = makeAvatar(CLASS_COLORS[p.class] || 0xffffff, p.callsign);
+        const group = makeAvatar(CLASS_COLORS[p.class] || 0xffffff, p.callsign, p.model);
         scene.add(group);
         entry = { group };
         remotes.set(p.callsign, entry);
@@ -189,6 +236,7 @@ export function createRiftScene(container, { onPortalChange } = {}) {
     raf = requestAnimationFrame(tick);
     const dt = Math.min(clock.getDelta(), 0.1);
     const t = clock.getElapsedTime();
+    nineRing.material.opacity = 0.52 + Math.sin(t * 1.8) * 0.2;
 
     // portal ring idle animation
     for (const key of Object.keys(portals)) {

@@ -27,11 +27,12 @@ export function randCode() {
   return out;
 }
 
-export function newCharacter(callsign, cls) {
+export function newCharacter(callsign, cls, model) {
   const def = CLASSES[cls];
   return {
     callsign,
     class: cls,
+    model,
     level: 1,
     xp: 0,
     xpToNext: xpFor(1),

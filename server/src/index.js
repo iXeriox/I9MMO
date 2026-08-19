@@ -83,6 +83,7 @@ function worldSnapshot() {
     .map((c) => ({
       callsign: c.callsign,
       class: c.character.class,
+      model: c.character.model,
       level: c.character.level,
       x: c.x || 0,
       z: c.z || 0,
@@ -114,12 +115,17 @@ wss.on('connection', (ws) => {
         case 'hello': {
           const callsign = String(msg.payload?.callsign || '').trim().slice(0, 16);
           const cls = msg.payload?.class;
+          const requestedModel = String(msg.payload?.model || 'character-female-a');
+          const model = /^character-(female|male)-[a-f]$/.test(requestedModel) ? requestedModel : 'character-female-a';
           if (!callsign || !CLASSES[cls] && !getCharacter(callsign)) {
             return send(ws, 'error', { message: 'Invalid callsign or class.' });
           }
           let character = getCharacter(callsign);
           if (!character) {
-            character = newCharacter(callsign, cls);
+            character = newCharacter(callsign, cls, model);
+            saveCharacter(character);
+          } else if (!character.model) {
+            character.model = model;
             saveCharacter(character);
           }
           conn.callsign = callsign;
