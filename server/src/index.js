@@ -86,6 +86,8 @@ function worldSnapshot() {
       model: c.character.model,
       accent: c.character.accent,
       sigil: c.character.sigil,
+      hairColor: c.character.hairColor,
+      clothingColor: c.character.clothingColor,
       level: c.character.level,
       x: c.x || 0,
       z: c.z || 0,
@@ -123,12 +125,15 @@ wss.on('connection', (ws) => {
           const accent = /^#[0-9A-Fa-f]{6}$/.test(requestedAccent) ? requestedAccent : '#4FE3C1';
           const allowedSigils = ['IX', '∆', 'Ø', 'Ψ', '⌁', '◇'];
           const sigil = allowedSigils.includes(msg.payload?.sigil) ? msg.payload.sigil : 'IX';
+          const colorOr = (value, fallback) => /^#[0-9A-Fa-f]{6}$/.test(String(value || '')) ? String(value) : fallback;
+          const hairColor = colorOr(msg.payload?.hairColor, '#2B1A12');
+          const clothingColor = colorOr(msg.payload?.clothingColor, '#344D7A');
           if (!callsign || !CLASSES[cls] && !getCharacter(callsign)) {
             return send(ws, 'error', { message: 'Invalid callsign or class.' });
           }
           let character = getCharacter(callsign);
           if (!character) {
-            character = newCharacter(callsign, cls, model, accent, sigil);
+            character = newCharacter(callsign, cls, model, accent, sigil, hairColor, clothingColor);
             saveCharacter(character);
           } else if (!character.model) {
             character.model = model;
@@ -136,6 +141,8 @@ wss.on('connection', (ws) => {
           }
           if (!character.accent) character.accent = accent;
           if (!character.sigil) character.sigil = sigil;
+          if (!character.hairColor) character.hairColor = hairColor;
+          if (!character.clothingColor) character.clothingColor = clothingColor;
           saveCharacter(character);
           conn.callsign = callsign;
           conn.character = character;
@@ -154,9 +161,20 @@ wss.on('connection', (ws) => {
 
         case 'enter_solo': {
           if (!conn.character) return;
+          conn.training = false;
           if (conn.character.hp <= 0) conn.character.hp = Math.ceil(conn.character.maxHp * 0.5);
           conn.enemy = spawnEnemy(conn.character.level);
           send(ws, 'solo_state', { character: conn.character, enemy: conn.enemy, log: [{ type: 'system', msg: `A ${conn.enemy.name} tears through the fracture.` }] });
+          break;
+        }
+
+        case 'enter_training': {
+          if (!conn.character) return;
+          conn.training = true;
+          conn.trainingStartHp = conn.character.hp;
+          conn.character.hp = conn.character.maxHp;
+          conn.enemy = { name: 'VX-9 Training Drone', maxHp: 90 + conn.character.level * 15, hp: 90 + conn.character.level * 15, atk: 4 + conn.character.level, xpReward: 0, shardReward: 0 };
+          send(ws, 'solo_state', { character: conn.character, enemy: conn.enemy, log: [{ type: 'system', msg: 'Combat simulator online. Damage and resources are safely virtualised.' }] });
           break;
         }
 
@@ -183,10 +201,15 @@ wss.on('connection', (ws) => {
 
             if (enemy.hp <= 0) {
               log.push({ type: 'hit', msg: `${enemy.name} destabilizes and collapses.` });
-              character.shards += enemy.shardReward;
-              const leveled = grantXp(character, enemy.xpReward);
-              log.push({ type: 'system', msg: `+${enemy.xpReward} XP, +${enemy.shardReward} shards.` });
-              if (leveled) log.push({ type: 'system', msg: `Level up! You are now level ${character.level}.` });
+              if (conn.training) {
+                character.hp = conn.trainingStartHp;
+                log.push({ type: 'system', msg: 'Simulation complete. Live combat telemetry recorded; health restored.' });
+              } else {
+                character.shards += enemy.shardReward;
+                const leveled = grantXp(character, enemy.xpReward);
+                log.push({ type: 'system', msg: `+${enemy.xpReward} XP, +${enemy.shardReward} shards.` });
+                if (leveled) log.push({ type: 'system', msg: `Level up! You are now level ${character.level}.` });
+              }
               over = true;
             } else {
               const edmg = rollVariance(enemy.atk);
@@ -194,9 +217,10 @@ wss.on('connection', (ws) => {
               log.push({ type: 'taken', msg: `${enemy.name} hits you for ${edmg}.` });
               if (character.hp <= 0) {
                 log.push({ type: 'taken', msg: 'You are overwhelmed and pulled back through the rift.' });
-                const lost = Math.min(character.shards, Math.round(character.shards * 0.1));
+                const lost = conn.training ? 0 : Math.min(character.shards, Math.round(character.shards * 0.1));
                 character.shards -= lost;
                 if (lost > 0) log.push({ type: 'taken', msg: `Lost ${lost} shards in the retreat.` });
+                if (conn.training) character.hp = conn.trainingStartHp;
                 over = true;
               }
             }
@@ -213,6 +237,7 @@ wss.on('connection', (ws) => {
             }
           }
 
+          if (over && conn.training) character.hp = conn.trainingStartHp;
           if (over) saveCharacter(character);
           send(ws, 'solo_state', { character, enemy, log, over });
           break;
@@ -247,6 +272,8 @@ wss.on('connection', (ws) => {
           const allowedSigils = ['IX', '∆', 'Ø', 'Ψ', '⌁', '◇'];
           if (/^#[0-9A-Fa-f]{6}$/.test(accent)) conn.character.accent = accent;
           if (allowedSigils.includes(msg.payload?.sigil)) conn.character.sigil = msg.payload.sigil;
+          if (/^#[0-9A-Fa-f]{6}$/.test(String(msg.payload?.hairColor || ''))) conn.character.hairColor = msg.payload.hairColor;
+          if (/^#[0-9A-Fa-f]{6}$/.test(String(msg.payload?.clothingColor || ''))) conn.character.clothingColor = msg.payload.clothingColor;
           saveCharacter(conn.character);
           send(ws, 'character_state', { character: conn.character });
           break;

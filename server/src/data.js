@@ -27,7 +27,7 @@ export function randCode() {
   return out;
 }
 
-export function newCharacter(callsign, cls, model, accent, sigil) {
+export function newCharacter(callsign, cls, model, accent, sigil, hairColor, clothingColor) {
   const def = CLASSES[cls];
   return {
     callsign,
@@ -35,6 +35,8 @@ export function newCharacter(callsign, cls, model, accent, sigil) {
     model,
     accent,
     sigil,
+    hairColor,
+    clothingColor,
     level: 1,
     xp: 0,
     xpToNext: xpFor(1),

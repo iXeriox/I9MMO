@@ -29,6 +29,14 @@
             </div>
           </div>
           <div>
+            <div class="step mono"><b>04</b> HAIR COLOR</div>
+            <div class="swatches"><button v-for="color in hairColors" :key="color" type="button" class="swatch" :class="{ selected: hairColor === color }" :style="{ '--swatch': color }" aria-label="Hair color" @click="hairColor = color" /></div>
+          </div>
+          <div>
+            <div class="step mono"><b>05</b> CLOTHING COLOR</div>
+            <div class="swatches"><button v-for="color in clothingColors" :key="color" type="button" class="swatch" :class="{ selected: clothingColor === color }" :style="{ '--swatch': color }" aria-label="Clothing color" @click="clothingColor = color" /></div>
+          </div>
+          <div>
             <div class="step mono"><b>03</b> CHOOSE YOUR GLYPH</div>
             <div class="glyphs" role="radiogroup" aria-label="Personal glyph">
               <button v-for="glyph in glyphs" :key="glyph" type="button" class="glyph mono"
@@ -39,11 +47,11 @@
 
         <div class="details-grid">
           <div>
-            <div class="step mono"><b>04</b> NAME YOUR SIGNAL</div>
+            <div class="step mono"><b>06</b> NAME YOUR SIGNAL</div>
             <input type="text" v-model="name" maxlength="16" placeholder="CALLSIGN" aria-label="Callsign" @keyup.enter="confirm" />
           </div>
           <div>
-            <div class="step mono"><b>05</b> CHOOSE YOUR PATH</div>
+            <div class="step mono"><b>07</b> CHOOSE YOUR PATH</div>
             <div class="class-grid">
               <button v-for="(c, key) in classes" :key="key" type="button" class="class-card"
                 :class="{ selected: cls === key }" :style="{ '--card-accent': c.color }" @click="cls = key">
@@ -81,16 +89,20 @@ const cls = ref('');
 const model = ref('character-female-a');
 const accent = ref('#4FE3C1');
 const sigil = ref('IX');
+const hairColor = ref('#2B1A12');
+const clothingColor = ref('#344D7A');
 const colors = [
   { name: 'Ion mint', value: '#4FE3C1' }, { name: 'Nebula violet', value: '#B26CFF' },
   { name: 'Solar gold', value: '#F4C868' }, { name: 'Nova coral', value: '#FF6B8A' },
   { name: 'Void blue', value: '#5A8CFF' }, { name: 'Plasma white', value: '#E9EAF4' },
 ];
 const glyphs = ['IX', '∆', 'Ø', 'Ψ', '⌁', '◇'];
+const hairColors = ['#171219', '#2B1A12', '#7B4426', '#D4AA67', '#B8C5D6', '#5B2D80'];
+const clothingColors = ['#23324F', '#344D7A', '#70364D', '#37645A', '#7A6234', '#30323A'];
 
 function confirm() {
   if (!name.value.trim() || !cls.value || !model.value) return;
-  emit('confirm', { callsign: name.value.trim(), cls: cls.value, model: model.value, accent: accent.value, sigil: sigil.value });
+  emit('confirm', { callsign: name.value.trim(), cls: cls.value, model: model.value, accent: accent.value, sigil: sigil.value, hairColor: hairColor.value, clothingColor: clothingColor.value });
 }
 </script>
 

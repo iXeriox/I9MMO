@@ -12,7 +12,7 @@ const KEYS = { w: false, a: false, s: false, d: false, q: false, e: false };
 const MOVE_SPEED = 6;
 const PORTAL_RADIUS = 3.2;
 
-export function createRiftScene(container, { onPortalChange } = {}) {
+export function createRiftScene(container, { onPortalChange, onInteract } = {}) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x07080d);
   scene.fog = new THREE.Fog(0x07080d, 25, 70);
@@ -134,6 +134,29 @@ export function createRiftScene(container, { onPortalChange } = {}) {
   grid.position.y = 0.01;
 
   scene.add(grid);
+
+  // Architectural language: a raised orbital concourse with luminous lane markings.
+  const concourseMaterial = new THREE.MeshStandardMaterial({ color: 0x111827, metalness: 0.72, roughness: 0.32 });
+  const trimMaterial = new THREE.MeshBasicMaterial({ color: 0x243f5f, transparent: true, opacity: 0.8 });
+  for (let i = 0; i < 4; i++) {
+    const angle = i * Math.PI / 2;
+    const deck = new THREE.Mesh(new THREE.BoxGeometry(6.5, 0.22, 18), concourseMaterial);
+    deck.position.set(Math.sin(angle) * 13, 0, Math.cos(angle) * 13);
+    deck.rotation.y = angle;
+    scene.add(deck);
+    const lane = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.02, 16), trimMaterial);
+    lane.position.copy(deck.position); lane.position.y = 0.13; lane.rotation.y = angle;
+    scene.add(lane);
+  }
+  for (let i = 0; i < 12; i++) {
+    const angle = i / 12 * Math.PI * 2;
+    const pylon = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.28, 3.8, 8), concourseMaterial);
+    pylon.position.set(Math.sin(angle) * 23, 1.8, Math.cos(angle) * 23);
+    scene.add(pylon);
+    const beacon = new THREE.PointLight(i % 3 === 0 ? 0xb26cff : 0x4fe3c1, 1.2, 7);
+    beacon.position.set(pylon.position.x, 3.7, pylon.position.z);
+    scene.add(beacon);
+  }
 
   // ---------- Infini9 spawn dais ----------
 
@@ -315,6 +338,8 @@ export function createRiftScene(container, { onPortalChange } = {}) {
       ),
       id: 'room',
     },
+    training: { ...makePortal(0xf4c868, -14, 9), id: 'training' },
+    arcade: { ...makePortal(0x5a8cff, 14, 9), id: 'arcade' },
   };
 
   // ---------- local avatar ----------
@@ -354,7 +379,9 @@ export function createRiftScene(container, { onPortalChange } = {}) {
       colorHex,
       nameLabel,
       model,
-      sigil = 'IX'
+      sigil = 'IX',
+      hairColor = '#2B1A12',
+      clothingColor = '#344D7A'
   ) {
     const group =
         new THREE.Group();
@@ -387,6 +414,20 @@ export function createRiftScene(container, { onPortalChange } = {}) {
     personalMark.scale.set(0.7, 0.3, 1);
     personalMark.material.color.set(colorHex);
     group.add(personalMark);
+
+    const outfit = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.42, 0.5, 0.78, 8),
+        new THREE.MeshStandardMaterial({ color: clothingColor, metalness: 0.35, roughness: 0.48 })
+    );
+    outfit.position.y = 1.05;
+    outfit.scale.z = 0.62;
+    group.add(outfit);
+    const hair = new THREE.Mesh(
+        new THREE.SphereGeometry(0.34, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62),
+        new THREE.MeshStandardMaterial({ color: hairColor, roughness: 0.8 })
+    );
+    hair.position.set(0, 1.78, 0);
+    group.add(hair);
 
     group.userData.motion =
         'idle';
@@ -597,6 +638,9 @@ export function createRiftScene(container, { onPortalChange } = {}) {
 
   const velocity =
       new THREE.Vector2();
+  let verticalVelocity = 0;
+  let localY = 0;
+  let jumpQueued = false;
 
   let activePortal =
       null;
@@ -607,6 +651,8 @@ export function createRiftScene(container, { onPortalChange } = {}) {
                             model,
                             accent,
                             sigil,
+                            hairColor,
+                            clothingColor,
                           }) {
     if (localAvatar) {
       scene.remove(
@@ -621,7 +667,9 @@ export function createRiftScene(container, { onPortalChange } = {}) {
             localColor,
             callsign,
             model,
-            sigil
+            sigil,
+            hairColor,
+            clothingColor
         );
 
     scene.add(
@@ -664,7 +712,9 @@ export function createRiftScene(container, { onPortalChange } = {}) {
                 new THREE.Color(p.accent || CLASS_COLORS[p.class] || 0xffffff).getHex(),
                 p.callsign,
                 p.model,
-                p.sigil
+                p.sigil,
+                p.hairColor,
+                p.clothingColor
             );
 
         scene.add(group);
@@ -756,11 +806,19 @@ export function createRiftScene(container, { onPortalChange } = {}) {
   // ---------- input ----------
 
   function onKeyDown(e) {
+    if (!controlsEnabled || ['INPUT', 'TEXTAREA'].includes(e.target?.tagName) || e.target?.isContentEditable) return;
     const k =
         e.key.toLowerCase();
 
     if (k in KEYS) {
       KEYS[k] = true;
+    }
+    if (e.code === 'Space' && !e.repeat) {
+      e.preventDefault();
+      jumpQueued = true;
+    }
+    if (k === 'f' && !e.repeat && activePortal && ['training', 'arcade'].includes(activePortal)) {
+      onInteract?.(activePortal);
     }
   }
 
@@ -818,6 +876,7 @@ export function createRiftScene(container, { onPortalChange } = {}) {
 
   function setControlsEnabled(enabled) {
     controlsEnabled = enabled;
+    if (!enabled) Object.keys(KEYS).forEach((key) => { KEYS[key] = false; });
     if (!enabled) onPointerUp();
     renderer.domElement.style.cursor = enabled ? 'grab' : 'default';
   }
@@ -992,6 +1051,12 @@ export function createRiftScene(container, { onPortalChange } = {}) {
               dz
           );
 
+      if (jumpQueued && localY <= 0.001) verticalVelocity = 6.4;
+      jumpQueued = false;
+      verticalVelocity -= 17 * dt;
+      localY = Math.max(0, localY + verticalVelocity * dt);
+      if (localY === 0) verticalVelocity = Math.max(0, verticalVelocity);
+
       const response =
           1 -
           Math.exp(
@@ -1066,7 +1131,7 @@ export function createRiftScene(container, { onPortalChange } = {}) {
 
       localAvatar.position.set(
           local.x,
-          0,
+          localY,
           local.z
       );
 

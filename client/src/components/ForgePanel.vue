@@ -18,6 +18,10 @@
         <button v-for="color in colors" :key="color" class="swatch" :class="{ selected: character.accent === color }"
           :style="{ '--swatch': color }" :aria-label="`Set signal colour ${color}`" @click="$emit('customize', { accent: color })" />
       </div>
+      <div class="mono sub palette-title">HAIR</div>
+      <div class="identity-row"><button v-for="color in hairColors" :key="color" class="swatch" :class="{ selected: character.hairColor === color }" :style="{ '--swatch': color }" aria-label="Hair color" @click="$emit('customize', { hairColor: color })" /></div>
+      <div class="mono sub palette-title">CLOTHING</div>
+      <div class="identity-row"><button v-for="color in clothingColors" :key="color" class="swatch" :class="{ selected: character.clothingColor === color }" :style="{ '--swatch': color }" aria-label="Clothing color" @click="$emit('customize', { clothingColor: color })" /></div>
       <div class="identity-row">
         <button v-for="sigil in sigils" :key="sigil" class="btn glyph" :class="{ selected: character.sigil === sigil }"
           @click="$emit('customize', { sigil })">{{ sigil }}</button>
@@ -41,6 +45,8 @@ const props = defineProps({ character: Object });
 defineEmits(['buy', 'customize', 'close']);
 const colors = ['#4FE3C1', '#B26CFF', '#F4C868', '#FF6B8A', '#5A8CFF', '#E9EAF4'];
 const sigils = ['IX', '∆', 'Ø', 'Ψ', '⌁', '◇'];
+const hairColors = ['#171219', '#2B1A12', '#7B4426', '#D4AA67', '#B8C5D6', '#5B2D80'];
+const clothingColors = ['#23324F', '#344D7A', '#70364D', '#37645A', '#7A6234', '#30323A'];
 const hpCost = computed(() => Math.round(15 * Math.pow(1.18, props.character.forgeHpBuys || 0)));
 const atkCost = computed(() => Math.round(20 * Math.pow(1.2, props.character.forgeAtkBuys || 0)));
 </script>
@@ -56,4 +62,5 @@ const atkCost = computed(() => Math.round(20 * Math.pow(1.2, props.character.for
 .swatch { width:30px; height:30px; padding:0; border:2px solid var(--border); border-radius:50%; background:var(--swatch); cursor:pointer; }
 .swatch.selected, .glyph.selected { outline:2px solid var(--accent); outline-offset:2px; }
 .glyph { min-width:36px; padding:6px; }
+.palette-title { margin:10px 0 6px; letter-spacing:.12em; }
 </style>
