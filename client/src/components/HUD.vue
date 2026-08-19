@@ -45,14 +45,14 @@
 
     <!-- portal prompt -->
     <div v-if="activePortal" class="portal-prompt panel">
-      <span class="mono">{{ activePortal === 'solo' ? 'SOLO RIFT' : 'INSTANCE ROOM' }}</span>
-      <button class="btn btn-primary" @click="$emit(activePortal === 'solo' ? 'open-solo' : 'open-room')">
-        Press to Enter
+      <span class="mono">{{ portalMeta.label }}</span>
+      <button class="btn btn-primary" @click="activatePortal">
+        {{ portalMeta.action }}
       </button>
     </div>
 
     <!-- movement hint -->
-    <div class="hint mono">WASD to move · walk into a ring to interact</div>
+    <div class="hint mono">WASD move · Q / E diagonal · SPACE jump · mouse orbit · F interact</div>
 
     <!-- chat -->
     <div class="chat panel">
@@ -78,6 +78,16 @@ const props = defineProps({
   showLeaderboard: { type: Boolean, default: false },
 });
 const emit = defineEmits(['open-solo', 'open-room', 'toggle-leaderboard', 'send-chat', 'open-forge']);
+const portalMeta = computed(() => ({
+  solo: { label: 'SOLO RIFT', action: 'Enter rift' },
+  room: { label: 'INSTANCE ROOM', action: 'Open room' },
+  training: { label: 'COMBAT SIMULATOR', action: 'Press F nearby' },
+  arcade: { label: 'ORBITAL ARCADE', action: 'Press F nearby' },
+}[props.activePortal] || { label: '', action: '' }));
+function activatePortal() {
+  if (props.activePortal === 'solo') emit('open-solo');
+  if (props.activePortal === 'room') emit('open-room');
+}
 
 const CLASS_META = {
   vanguard: { name: 'Vanguard', color: '#B26CFF' },
