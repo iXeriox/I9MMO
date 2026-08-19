@@ -8,7 +8,7 @@ const CLASS_COLORS = {
   wraithhunter: 0xF4C868,
 };
 
-const KEYS = { w: false, a: false, s: false, d: false };
+const KEYS = { w: false, a: false, s: false, d: false, q: false, e: false };
 const MOVE_SPEED = 6;
 const PORTAL_RADIUS = 3.2;
 
@@ -1037,11 +1037,13 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
 
       const forwardInput =
           Number(KEYS.w) -
-          Number(KEYS.s);
+          Number(KEYS.s) +
+          0.707 * (Number(KEYS.q) + Number(KEYS.e));
 
       const rightInput =
           Number(KEYS.d) -
-          Number(KEYS.a);
+          Number(KEYS.a) +
+          0.707 * (Number(KEYS.e) - Number(KEYS.q));
 
       dx =
           forward.x *
