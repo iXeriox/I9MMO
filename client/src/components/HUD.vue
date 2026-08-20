@@ -52,7 +52,7 @@
     </div>
 
     <!-- movement hint -->
-    <div class="hint mono">WASD move · SPACE jump · mouse orbit · F interact · 1/2 emote</div>
+    <div class="hint mono">WASD move · SPACE jump · mouse orbit · click your character to wave · F interact · 1/2 emote</div>
 
     <!-- chat -->
     <div class="chat panel">
@@ -83,6 +83,8 @@ const portalMeta = computed(() => ({
   room: { label: 'INSTANCE ROOM', action: 'Open room' },
   training: { label: 'COMBAT SIMULATOR', action: 'Press F nearby' },
   arcade: { label: 'ORBITAL ARCADE', action: 'Press F nearby' },
+  maze: { label: 'NEON MAZE', action: 'Press F to teleport' },
+  battleship: { label: 'BATTLE SHIPS', action: 'Press F to play' },
 }[props.activePortal] || { label: '', action: '' }));
 function activatePortal() {
   if (props.activePortal === 'solo') emit('open-solo');

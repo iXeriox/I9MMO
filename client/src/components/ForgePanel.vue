@@ -29,6 +29,13 @@
       <div class="identity-row"><button v-for="color in hairColors" :key="color" class="swatch" :class="{ selected: character.hairColor === color }" :style="{ '--swatch': color }" aria-label="Head paint" @click="$emit('customize', { hairColor: color })" /><input type="color" :value="character.hairColor" aria-label="Custom head paint" @change="$emit('customize', { hairColor: $event.target.value })" /></div>
       <div class="mono sub palette-title">BODY PAINT</div>
       <div class="identity-row"><button v-for="color in clothingColors" :key="color" class="swatch" :class="{ selected: character.clothingColor === color }" :style="{ '--swatch': color }" aria-label="Body paint" @click="$emit('customize', { clothingColor: color })" /><input type="color" :value="character.clothingColor" aria-label="Custom body paint" @change="$emit('customize', { clothingColor: $event.target.value })" /></div>
+      <div class="mono label identity-label">HELD ITEM CREATOR</div>
+      <div class="item-creator">
+        <label class="mono">FORM<select v-model="item.type"><option value="none">Empty hands</option><option value="sword">Energy sword</option><option value="blaster">Pulse blaster</option><option value="shield">Rift shield</option></select></label>
+        <label class="mono">PAINT<input v-model="item.color" type="color" /></label>
+        <label class="mono">SCALE<input v-model.number="item.scale" type="range" min="0.5" max="1.5" step="0.1" /></label>
+        <button class="btn btn-primary" @click="$emit('customize',{ item:{...item} })">Equip design</button>
+      </div>
       <div class="identity-row">
         <button v-for="sigil in sigils" :key="sigil" class="btn glyph" :class="{ selected: character.sigil === sigil }"
           @click="$emit('customize', { sigil })">{{ sigil }}</button>
@@ -47,7 +54,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue';
+import { computed, reactive } from 'vue';
 const props = defineProps({ character: Object });
 defineEmits(['buy', 'customize', 'close']);
 const colors = ['#4FE3C1', '#B26CFF', '#F4C868', '#FF6B8A', '#5A8CFF', '#E9EAF4'];
@@ -55,6 +62,7 @@ const sigils = ['IX', '∆', 'Ø', 'Ψ', '⌁', '◇'];
 const hairColors = ['#171219', '#2B1A12', '#7B4426', '#D4AA67', '#B8C5D6', '#5B2D80'];
 const clothingColors = ['#23324F', '#344D7A', '#70364D', '#37645A', '#7A6234', '#30323A'];
 const avatars = ['female-a', 'female-b', 'female-c', 'female-d', 'female-e', 'female-f', 'male-a', 'male-b', 'male-c', 'male-d', 'male-e', 'male-f'].map((name) => `character-${name}`);
+const item = reactive({ type: props.character.item?.type || 'none', color: props.character.item?.color || '#F4C868', scale: props.character.item?.scale || 1 });
 const hpCost = computed(() => Math.round(15 * Math.pow(1.18, props.character.forgeHpBuys || 0)));
 const atkCost = computed(() => Math.round(20 * Math.pow(1.2, props.character.forgeAtkBuys || 0)));
 </script>
@@ -75,4 +83,5 @@ const atkCost = computed(() => Math.round(20 * Math.pow(1.2, props.character.for
 .model-grid { display:grid; grid-template-columns:repeat(6,1fr); gap:5px; margin-bottom:12px; }
 .model-btn { position:relative; height:54px; padding:2px; overflow:hidden; border:1px solid var(--border); border-radius:7px; background:#080a12; color:var(--text-faint); cursor:pointer; }
 .model-btn img { width:100%; height:100%; object-fit:contain; }.model-btn span { position:absolute; right:3px; bottom:2px; font-size:7px; }.model-btn.selected { border-color:var(--accent); box-shadow:inset 0 0 14px rgba(79,227,193,.12); }
+.item-creator{display:grid;grid-template-columns:1.4fr .7fr 1fr;gap:8px;align-items:end;padding:12px;margin-bottom:12px;border:1px solid var(--border);border-radius:9px;background:#080b14}.item-creator label{display:grid;gap:5px;font-size:9px;color:var(--text-dim)}.item-creator select{height:31px;background:#090b13;color:var(--text);border:1px solid var(--border);border-radius:6px}.item-creator input[type=color]{height:31px;width:100%}.item-creator .btn{grid-column:1/-1}
 </style>
