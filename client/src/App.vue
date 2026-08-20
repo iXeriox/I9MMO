@@ -174,7 +174,6 @@ function mountScene() {
     onInteract: (area) => {
       if (area === 'training') openTraining();
       if (area === 'arcade') overlay.value = 'arcade';
-      if (area === 'maze') scene?.teleportToMaze();
       if (area === 'battleship') overlay.value = 'battleship';
     },
   });

@@ -358,7 +358,6 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
         },
         training: { ...makePortal(0xf4c868, -14, 9), id: 'training' },
         arcade: { ...makePortal(0x5a8cff, 14, 9), id: 'arcade' },
-        maze: { ...makePortal(0xff6b8a, -15, -15), id: 'maze' },
         battleship: { ...makePortal(0x43b5ff, 15, -15), id: 'battleship' },
     };
 
@@ -367,7 +366,6 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
         room: 'INSTANCE ROOM',
         training: 'COMBAT TRAINING',
         arcade: 'ARCADE',
-        maze: 'NEON MAZE',
         battleship: 'BATTLE SHIPS',
     };
     for (const key of Object.keys(portals)) {
@@ -377,28 +375,10 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
         portals[key].group.add(sign);
     }
 
-    const mazeWalls = [];
-    const mazeLayout = [[-8,18,1,12],[8,18,1,12],[0,12,17,1],[0,24,17,1],[-5,15,1,5],[-2,18,1,7],[2,15,1,5],[5,20,1,7],[-5,21,5,1],[1,21,7,1],[3,17,5,1],[-5,17,3,1]];
-    const mazeMaterial = new THREE.MeshStandardMaterial({ color:0x1d2440, emissive:0xff315f, emissiveIntensity:.18, metalness:.55 });
-    mazeLayout.forEach(([x,z,w,d]) => {
-        const wall = new THREE.Mesh(new THREE.BoxGeometry(w,2.6,d),mazeMaterial);
-        wall.position.set(x,1.3,z); wall.castShadow=true; wall.receiveShadow=true; scene.add(wall);
-        mazeWalls.push({minX:x-w/2-.45,maxX:x+w/2+.45,minZ:z-d/2-.45,maxZ:z+d/2+.45});
-    });
-    const mazeGoal=makeLabel('MAZE CORE'); mazeGoal.position.set(6.3,.7,22.5); mazeGoal.material.color.set(0xff6b8a); scene.add(mazeGoal);
-
-    function teleportToMaze(){ local.x=0; local.z=10.5; localY=0; velocity.set(0,0); }
     function getFloorHeight(x,z){
         for(let i=0;i<4;i++){const a=i*Math.PI/2,cx=Math.sin(a)*13,cz=Math.cos(a)*13,dx=x-cx,dz=z-cz,lx=dx*Math.cos(a)-dz*Math.sin(a),lz=dx*Math.sin(a)+dz*Math.cos(a);if(Math.abs(lx)<3.25&&Math.abs(lz)<9)return .11;}
         return 0;
     }
-    function addHeldItem(body,item){
-        const material=new THREE.MeshStandardMaterial({color:item.color||'#F4C868',metalness:.65,roughness:.28});
-        const scale=THREE.MathUtils.clamp(Number(item.scale)||1,.5,1.5); let geometry;
-        if(item.type==='blaster')geometry=new THREE.BoxGeometry(.12,.12,.55);else if(item.type==='shield')geometry=new THREE.CylinderGeometry(.28,.28,.07,12);else geometry=new THREE.BoxGeometry(.1,.72,.1);
-        const held=new THREE.Mesh(geometry,material);held.name='player-held-item';held.scale.setScalar(scale);held.position.set(.42,1.15,.16);held.rotation.z=item.type==='shield'?Math.PI/2:-.25;held.castShadow=true;body.add(held);
-    }
-
     // ---------- local avatar ----------
 
     const loader = new GLTFLoader();
@@ -518,7 +498,6 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
 
                 // The Kenney GLBs already contain a complete head. Do not stack a
                 // procedural head/hair cap on top; recolour their authored meshes.
-                if (item?.type && item.type !== 'none') addHeldItem(body, item);
 
                 const mixer =
                     new THREE.AnimationMixer(
@@ -916,7 +895,7 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
             e.preventDefault();
             jumpQueued = true;
         }
-        if (k === 'f' && !e.repeat && activePortal && ['training', 'arcade', 'maze', 'battleship'].includes(activePortal)) {
+        if (k === 'f' && !e.repeat && activePortal && ['training', 'arcade', 'battleship'].includes(activePortal)) {
             onInteract?.(activePortal);
         }
         if ((k === '1' || k === '2') && !e.repeat && localAvatar) {
@@ -1236,11 +1215,8 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
                 );
             }
 
-            const nextX=THREE.MathUtils.clamp(local.x+velocity.x*dt,-28,28);
-            const nextZ=THREE.MathUtils.clamp(local.z+velocity.y*dt,-28,28);
-            const blocked=(x,z)=>mazeWalls.some(w=>x>w.minX&&x<w.maxX&&z>w.minZ&&z<w.maxZ);
-            if(!blocked(nextX,local.z))local.x=nextX;else velocity.x=0;
-            if(!blocked(local.x,nextZ))local.z=nextZ;else velocity.y=0;
+            local.x = THREE.MathUtils.clamp(local.x + velocity.x * dt, -28, 28);
+            local.z = THREE.MathUtils.clamp(local.z + velocity.y * dt, -28, 28);
 
             localAvatar.position.set(
                 local.x,
