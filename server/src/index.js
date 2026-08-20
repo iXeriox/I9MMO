@@ -88,6 +88,7 @@ function worldSnapshot() {
         sigil: c.character.sigil,
         hairColor: c.character.hairColor,
         clothingColor: c.character.clothingColor,
+        item: c.character.item,
         level: c.character.level,
         x: c.x || 0,
         y: c.y || 0,
@@ -278,6 +279,10 @@ wss.on('connection', (ws) => {
           if (allowedSigils.includes(msg.payload?.sigil)) conn.character.sigil = msg.payload.sigil;
           if (/^#[0-9A-Fa-f]{6}$/.test(String(msg.payload?.hairColor || ''))) conn.character.hairColor = msg.payload.hairColor;
           if (/^#[0-9A-Fa-f]{6}$/.test(String(msg.payload?.clothingColor || ''))) conn.character.clothingColor = msg.payload.clothingColor;
+          const item = msg.payload?.item;
+          if (item && ['none','sword','blaster','shield'].includes(item.type) && /^#[0-9A-Fa-f]{6}$/.test(String(item.color)) && Number(item.scale) >= .5 && Number(item.scale) <= 1.5) {
+            conn.character.item = { type:item.type, color:item.color, scale:Number(item.scale) };
+          }
           saveCharacter(conn.character);
           send(ws, 'character_state', { character: conn.character });
           break;

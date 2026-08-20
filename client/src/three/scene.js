@@ -358,6 +358,8 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
         },
         training: { ...makePortal(0xf4c868, -14, 9), id: 'training' },
         arcade: { ...makePortal(0x5a8cff, 14, 9), id: 'arcade' },
+        maze: { ...makePortal(0xff6b8a, -15, -15), id: 'maze' },
+        battleship: { ...makePortal(0x43b5ff, 15, -15), id: 'battleship' },
     };
 
     const portalSignage = {
@@ -365,12 +367,36 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
         room: 'INSTANCE ROOM',
         training: 'COMBAT TRAINING',
         arcade: 'ARCADE',
+        maze: 'NEON MAZE',
+        battleship: 'BATTLE SHIPS',
     };
     for (const key of Object.keys(portals)) {
         const sign = makeLabel(portalSignage[key]);
         sign.scale.set(3.1, 0.72, 1);
         sign.position.set(0, 3.15, 0);
         portals[key].group.add(sign);
+    }
+
+    const mazeWalls = [];
+    const mazeLayout = [[-8,18,1,12],[8,18,1,12],[0,12,17,1],[0,24,17,1],[-5,15,1,5],[-2,18,1,7],[2,15,1,5],[5,20,1,7],[-5,21,5,1],[1,21,7,1],[3,17,5,1],[-5,17,3,1]];
+    const mazeMaterial = new THREE.MeshStandardMaterial({ color:0x1d2440, emissive:0xff315f, emissiveIntensity:.18, metalness:.55 });
+    mazeLayout.forEach(([x,z,w,d]) => {
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(w,2.6,d),mazeMaterial);
+        wall.position.set(x,1.3,z); wall.castShadow=true; wall.receiveShadow=true; scene.add(wall);
+        mazeWalls.push({minX:x-w/2-.45,maxX:x+w/2+.45,minZ:z-d/2-.45,maxZ:z+d/2+.45});
+    });
+    const mazeGoal=makeLabel('MAZE CORE'); mazeGoal.position.set(6.3,.7,22.5); mazeGoal.material.color.set(0xff6b8a); scene.add(mazeGoal);
+
+    function teleportToMaze(){ local.x=0; local.z=10.5; localY=0; velocity.set(0,0); }
+    function getFloorHeight(x,z){
+        for(let i=0;i<4;i++){const a=i*Math.PI/2,cx=Math.sin(a)*13,cz=Math.cos(a)*13,dx=x-cx,dz=z-cz,lx=dx*Math.cos(a)-dz*Math.sin(a),lz=dx*Math.sin(a)+dz*Math.cos(a);if(Math.abs(lx)<3.25&&Math.abs(lz)<9)return .11;}
+        return 0;
+    }
+    function addHeldItem(body,item){
+        const material=new THREE.MeshStandardMaterial({color:item.color||'#F4C868',metalness:.65,roughness:.28});
+        const scale=THREE.MathUtils.clamp(Number(item.scale)||1,.5,1.5); let geometry;
+        if(item.type==='blaster')geometry=new THREE.BoxGeometry(.12,.12,.55);else if(item.type==='shield')geometry=new THREE.CylinderGeometry(.28,.28,.07,12);else geometry=new THREE.BoxGeometry(.1,.72,.1);
+        const held=new THREE.Mesh(geometry,material);held.name='player-held-item';held.scale.setScalar(scale);held.position.set(.42,1.15,.16);held.rotation.z=item.type==='shield'?Math.PI/2:-.25;held.castShadow=true;body.add(held);
     }
 
     // ---------- local avatar ----------
@@ -413,7 +439,8 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
         sigil = 'IX',
         hairColor = '#2B1A12',
         clothingColor = '#344D7A',
-        level = 1
+        level = 1,
+        item = null
     ) {
         const group =
             new THREE.Group();
@@ -461,25 +488,14 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
                     2.35
                 );
 
-                let headMesh = null;
-
                 body.traverse(
                     (object) => {
                         if (
                             object.isMesh
                         ) {
-                            const isHead = object.name.toLowerCase().includes('head');
-                            if (isHead) {
-                                // Leave the face/skin texture alone — this mesh has no
-                                // separate hair geometry, so painting it solid used to
-                                // wipe out the whole face. We add a proper hair piece
-                                // below instead.
-                                object.castShadow = true;
-                                object.receiveShadow = true;
-                                headMesh = object;
-                                return;
-                            }
-                            const paint = new THREE.Color(clothingColor);
+                            const meshName = object.name.toLowerCase();
+                            const isHead = /head|face|hair/.test(meshName);
+                            const paint = new THREE.Color(isHead ? hairColor : clothingColor);
                             const materials = Array.isArray(object.material) ? object.material : [object.material];
                             const painted = materials.map((material) => {
                                 const clone = material.clone();
@@ -500,41 +516,9 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
 
                 group.add(body);
 
-                // ---- procedural hair cap ----
-                // Measured against the actual head mesh bounds (post-scale) so it
-                // sits correctly regardless of which of the eight models loaded.
-                if (headMesh) {
-                    body.updateMatrixWorld(true);
-                    const headBox = new THREE.Box3().setFromObject(headMesh);
-                    const headCenter = headBox.getCenter(new THREE.Vector3());
-                    const headWidth = headBox.max.x - headBox.min.x;
-                    const headDepth = headBox.max.z - headBox.min.z;
-
-                    const hairGeo = new THREE.SphereGeometry(
-                        Math.max(headWidth, headDepth) * 0.58,
-                        16,
-                        12,
-                        0,
-                        Math.PI * 2,
-                        0,
-                        Math.PI * 0.58
-                    );
-                    const hairMat = new THREE.MeshStandardMaterial({
-                        color: new THREE.Color(hairColor),
-                        roughness: 0.58,
-                        metalness: 0.06,
-                    });
-                    const hair = new THREE.Mesh(hairGeo, hairMat);
-                    hair.castShadow = true;
-
-                    const worldTop = new THREE.Vector3(
-                        headCenter.x,
-                        headBox.max.y - (headBox.max.y - headBox.min.y) * 0.12,
-                        headCenter.z - headDepth * 0.06
-                    );
-                    hair.position.copy(group.worldToLocal(worldTop));
-                    group.add(hair);
-                }
+                // The Kenney GLBs already contain a complete head. Do not stack a
+                // procedural head/hair cap on top; recolour their authored meshes.
+                if (item?.type && item.type !== 'none') addHeldItem(body, item);
 
                 const mixer =
                     new THREE.AnimationMixer(
@@ -754,6 +738,7 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
                                 hairColor,
                                 clothingColor,
                                 level,
+                                item,
                             }) {
         if (localAvatar) {
             scene.remove(
@@ -771,7 +756,8 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
                 sigil,
                 hairColor,
                 clothingColor,
-                level
+                level,
+                item
             );
 
         scene.add(
@@ -808,7 +794,7 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
                     p.callsign
                 );
 
-            const styleKey = [p.model, p.accent, p.sigil, p.hairColor, p.clothingColor, p.level].join('|');
+            const styleKey = [p.model,p.accent,p.sigil,p.hairColor,p.clothingColor,p.level,JSON.stringify(p.item)].join('|');
             if (entry && entry.styleKey !== styleKey) {
                 scene.remove(entry.group);
                 remotes.delete(p.callsign);
@@ -824,7 +810,8 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
                         p.sigil,
                         p.hairColor,
                         p.clothingColor,
-                        p.level
+                        p.level,
+                        p.item
                     );
 
                 scene.add(group);
@@ -929,7 +916,7 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
             e.preventDefault();
             jumpQueued = true;
         }
-        if (k === 'f' && !e.repeat && activePortal && ['training', 'arcade'].includes(activePortal)) {
+        if (k === 'f' && !e.repeat && activePortal && ['training', 'arcade', 'maze', 'battleship'].includes(activePortal)) {
             onInteract?.(activePortal);
         }
         if ((k === '1' || k === '2') && !e.repeat && localAvatar) {
@@ -990,6 +977,20 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
     renderer.domElement.addEventListener('wheel', onWheel, { passive: true });
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    function onClick(event) {
+        if (!controlsEnabled || !localAvatar || Math.abs(event.movementX) > 2) return;
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+        raycaster.setFromCamera(pointer, camera);
+        if (raycaster.intersectObject(localAvatar, true).length) {
+            playEmote(localAvatar, 'emote-yes');
+            emoteCallback?.('emote-yes');
+        }
+    }
+    renderer.domElement.addEventListener('click', onClick);
 
     function setControlsEnabled(enabled) {
         controlsEnabled = enabled;
@@ -1178,11 +1179,12 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
                     dz
                 );
 
-            if (jumpQueued && localY <= 0.001) verticalVelocity = 6.4;
+            const floorY = getFloorHeight(local.x, local.z);
+            if (jumpQueued && localY <= floorY + 0.001) verticalVelocity = 6.4;
             jumpQueued = false;
             verticalVelocity -= 17 * dt;
-            localY = Math.max(0, localY + verticalVelocity * dt);
-            if (localY === 0) verticalVelocity = Math.max(0, verticalVelocity);
+            localY = Math.max(floorY, localY + verticalVelocity * dt);
+            if (localY === floorY) verticalVelocity = Math.max(0, verticalVelocity);
 
             const response =
                 1 -
@@ -1234,27 +1236,11 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
                 );
             }
 
-            local.x =
-                Math.max(
-                    -28,
-                    Math.min(
-                        28,
-                        local.x +
-                        velocity.x *
-                        dt
-                    )
-                );
-
-            local.z =
-                Math.max(
-                    -28,
-                    Math.min(
-                        28,
-                        local.z +
-                        velocity.y *
-                        dt
-                    )
-                );
+            const nextX=THREE.MathUtils.clamp(local.x+velocity.x*dt,-28,28);
+            const nextZ=THREE.MathUtils.clamp(local.z+velocity.y*dt,-28,28);
+            const blocked=(x,z)=>mazeWalls.some(w=>x>w.minX&&x<w.maxX&&z>w.minZ&&z<w.maxZ);
+            if(!blocked(nextX,local.z))local.x=nextX;else velocity.x=0;
+            if(!blocked(local.x,nextZ))local.z=nextZ;else velocity.y=0;
 
             localAvatar.position.set(
                 local.x,
@@ -1406,6 +1392,7 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
         window.removeEventListener('pointermove', onPointerMove);
         window.removeEventListener('pointerup', onPointerUp);
         renderer.domElement.removeEventListener('wheel', onWheel);
+        renderer.domElement.removeEventListener('click', onClick);
 
         renderer.dispose();
 
@@ -1426,6 +1413,7 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
         onEmote,
         playRemoteEmote,
         setControlsEnabled,
+        teleportToMaze,
         dispose,
     };
 }

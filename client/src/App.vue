@@ -53,6 +53,7 @@
     />
 
     <ArcadePanel v-if="overlay === 'arcade'" @close="overlay = null" />
+    <BattleshipPanel v-if="overlay === 'battleship'" @close="overlay = null" />
   </template>
 </template>
 
@@ -64,6 +65,7 @@ import CombatPanel from './components/CombatPanel.vue';
 import RoomPanel from './components/RoomPanel.vue';
 import ForgePanel from './components/ForgePanel.vue';
 import ArcadePanel from './components/ArcadePanel.vue';
+import BattleshipPanel from './components/BattleshipPanel.vue';
 import { createGameSocket } from './net/socket.js';
 import { createRiftScene } from './three/scene.js';
 
@@ -116,7 +118,7 @@ function connectSocket() {
 
   socket.on('welcome', ({ character: c, leaderboard: lb }) => {
     character.value = c;
-    identity = { callsign: c.callsign, class: c.class, model: c.model || identity?.model || 'character-female-a', accent: c.accent || identity?.accent, sigil: c.sigil || identity?.sigil, hairColor: c.hairColor || identity?.hairColor, clothingColor: c.clothingColor || identity?.clothingColor };
+    identity = { callsign: c.callsign, class: c.class, model: c.model || identity?.model || 'character-female-a', accent: c.accent || identity?.accent, sigil: c.sigil || identity?.sigil, hairColor: c.hairColor || identity?.hairColor, clothingColor: c.clothingColor || identity?.clothingColor, item: c.item || identity?.item };
     localStorage.setItem(IDENTITY_KEY, JSON.stringify(identity));
     leaderboard.value = lb || [];
     createError.value = '';
@@ -172,6 +174,8 @@ function mountScene() {
     onInteract: (area) => {
       if (area === 'training') openTraining();
       if (area === 'arcade') overlay.value = 'arcade';
+      if (area === 'maze') scene?.teleportToMaze();
+      if (area === 'battleship') overlay.value = 'battleship';
     },
   });
   scene.setLocalPlayer({ ...character.value, cls: character.value.class, model: character.value.model || identity?.model });
