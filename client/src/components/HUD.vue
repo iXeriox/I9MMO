@@ -83,6 +83,7 @@ const portalMeta = computed(() => ({
   room: { label: 'INSTANCE ROOM', action: 'Open room' },
   training: { label: 'COMBAT SIMULATOR', action: 'Press F nearby' },
   arcade: { label: 'ORBITAL ARCADE', action: 'Press F nearby' },
+  battleship: { label: 'BATTLE SHIPS', action: 'Press F to play' },
 }[props.activePortal] || { label: '', action: '' }));
 function activatePortal() {
   if (props.activePortal === 'solo') emit('open-solo');

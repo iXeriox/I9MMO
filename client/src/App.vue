@@ -53,6 +53,7 @@
     />
 
     <ArcadePanel v-if="overlay === 'arcade'" @close="overlay = null" />
+    <BattleshipPanel v-if="overlay === 'battleship'" @close="overlay = null" />
   </template>
 </template>
 
@@ -64,6 +65,7 @@ import CombatPanel from './components/CombatPanel.vue';
 import RoomPanel from './components/RoomPanel.vue';
 import ForgePanel from './components/ForgePanel.vue';
 import ArcadePanel from './components/ArcadePanel.vue';
+import BattleshipPanel from './components/BattleshipPanel.vue';
 import { createGameSocket } from './net/socket.js';
 import { createRiftScene } from './three/scene.js';
 
@@ -172,6 +174,7 @@ function mountScene() {
     onInteract: (area) => {
       if (area === 'training') openTraining();
       if (area === 'arcade') overlay.value = 'arcade';
+      if (area === 'battleship') overlay.value = 'battleship';
     },
   });
   scene.setLocalPlayer({ ...character.value, cls: character.value.class, model: character.value.model || identity?.model });
