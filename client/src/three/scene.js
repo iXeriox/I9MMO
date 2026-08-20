@@ -419,7 +419,8 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
         sigil = 'IX',
         hairColor = '#2B1A12',
         clothingColor = '#344D7A',
-        level = 1
+        level = 1,
+        item = null
     ) {
         const group =
             new THREE.Group();
@@ -716,6 +717,7 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
                                 hairColor,
                                 clothingColor,
                                 level,
+                                item,
                             }) {
         if (localAvatar) {
             scene.remove(
@@ -733,7 +735,8 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
                 sigil,
                 hairColor,
                 clothingColor,
-                level
+                level,
+                item
             );
 
         scene.add(
@@ -770,7 +773,7 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
                     p.callsign
                 );
 
-            const styleKey = [p.model, p.accent, p.sigil, p.hairColor, p.clothingColor, p.level].join('|');
+            const styleKey = [p.model,p.accent,p.sigil,p.hairColor,p.clothingColor,p.level,JSON.stringify(p.item)].join('|');
             if (entry && entry.styleKey !== styleKey) {
                 scene.remove(entry.group);
                 remotes.delete(p.callsign);
@@ -786,7 +789,8 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
                         p.sigil,
                         p.hairColor,
                         p.clothingColor,
-                        p.level
+                        p.level,
+                        p.item
                     );
 
                 scene.add(group);
@@ -952,6 +956,20 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
     renderer.domElement.addEventListener('wheel', onWheel, { passive: true });
+
+    const raycaster = new THREE.Raycaster();
+    const pointer = new THREE.Vector2();
+    function onClick(event) {
+        if (!controlsEnabled || !localAvatar || Math.abs(event.movementX) > 2) return;
+        const rect = renderer.domElement.getBoundingClientRect();
+        pointer.set(((event.clientX - rect.left) / rect.width) * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+        raycaster.setFromCamera(pointer, camera);
+        if (raycaster.intersectObject(localAvatar, true).length) {
+            playEmote(localAvatar, 'emote-yes');
+            emoteCallback?.('emote-yes');
+        }
+    }
+    renderer.domElement.addEventListener('click', onClick);
 
     function setControlsEnabled(enabled) {
         controlsEnabled = enabled;
@@ -1350,6 +1368,7 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
         window.removeEventListener('pointermove', onPointerMove);
         window.removeEventListener('pointerup', onPointerUp);
         renderer.domElement.removeEventListener('wheel', onWheel);
+        renderer.domElement.removeEventListener('click', onClick);
 
         renderer.dispose();
 
@@ -1370,6 +1389,7 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
         onEmote,
         playRemoteEmote,
         setControlsEnabled,
+        teleportToMaze,
         dispose,
     };
 }

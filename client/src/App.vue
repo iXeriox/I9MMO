@@ -118,7 +118,7 @@ function connectSocket() {
 
   socket.on('welcome', ({ character: c, leaderboard: lb }) => {
     character.value = c;
-    identity = { callsign: c.callsign, class: c.class, model: c.model || identity?.model || 'character-female-a', accent: c.accent || identity?.accent, sigil: c.sigil || identity?.sigil, hairColor: c.hairColor || identity?.hairColor, clothingColor: c.clothingColor || identity?.clothingColor };
+    identity = { callsign: c.callsign, class: c.class, model: c.model || identity?.model || 'character-female-a', accent: c.accent || identity?.accent, sigil: c.sigil || identity?.sigil, hairColor: c.hairColor || identity?.hairColor, clothingColor: c.clothingColor || identity?.clothingColor, item: c.item || identity?.item };
     localStorage.setItem(IDENTITY_KEY, JSON.stringify(identity));
     leaderboard.value = lb || [];
     createError.value = '';
