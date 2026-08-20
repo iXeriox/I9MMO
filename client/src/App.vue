@@ -5,51 +5,51 @@
     <div ref="sceneContainer" class="scene"></div>
 
     <HUD
-      :character="character"
-      :connected="connected"
-      :active-portal="activePortal"
-      :chat="chat"
-      :leaderboard="leaderboard"
-      :show-leaderboard="overlay === 'leaderboard-pin'"
-      @open-solo="openSolo"
-      @open-room="overlay = 'room'"
-      @open-forge="overlay = 'forge'"
-      @toggle-leaderboard="toggleLeaderboard"
-      @send-chat="sendChat"
+        :character="character"
+        :connected="connected"
+        :active-portal="activePortal"
+        :chat="chat"
+        :leaderboard="leaderboard"
+        :show-leaderboard="overlay === 'leaderboard-pin'"
+        @open-solo="openSolo"
+        @open-room="overlay = 'room'"
+        @open-forge="overlay = 'forge'"
+        @toggle-leaderboard="toggleLeaderboard"
+        @send-chat="sendChat"
     />
 
     <CombatPanel
-      v-if="overlay === 'combat' && enemy"
-      :character="character"
-      :enemy="enemy"
-      :log="combatLog"
-      :over="combatOver"
-      @action="soloAction"
-      @again="combatTraining ? openTraining() : openSolo()"
-      @close="closeCombat"
+        v-if="overlay === 'combat' && enemy"
+        :character="character"
+        :enemy="enemy"
+        :log="combatLog"
+        :over="combatOver"
+        @action="soloAction"
+        @again="combatTraining ? openTraining() : openSolo()"
+        @close="closeCombat"
     />
 
     <RoomPanel
-      v-if="overlay === 'room'"
-      :room="room"
-      :busy="roomBusy"
-      :error="roomError"
-      :cooldown="attackCooldown"
-      :claimed="rewardClaimed"
-      @create="createRoom"
-      @join="joinRoom"
-      @leave="leaveRoom"
-      @attack="roomAttack"
-      @claim="claimReward"
-      @close="overlay = null"
+        v-if="overlay === 'room'"
+        :room="room"
+        :busy="roomBusy"
+        :error="roomError"
+        :cooldown="attackCooldown"
+        :claimed="rewardClaimed"
+        @create="createRoom"
+        @join="joinRoom"
+        @leave="leaveRoom"
+        @attack="roomAttack"
+        @claim="claimReward"
+        @close="overlay = null"
     />
 
     <ForgePanel
-      v-if="overlay === 'forge'"
-      :character="character"
-      @buy="forgeBuy"
-      @customize="customizeCharacter"
-      @close="overlay = null"
+        v-if="overlay === 'forge'"
+        :character="character"
+        @buy="forgeBuy"
+        @customize="customizeCharacter"
+        @close="overlay = null"
     />
 
     <ArcadePanel v-if="overlay === 'arcade'" @close="overlay = null" />
@@ -152,6 +152,10 @@ function connectSocket() {
     chat.value.push(m);
     if (chat.value.length > 60) chat.value = chat.value.slice(-60);
   });
+
+  socket.on('emote', ({ callsign, emote }) => {
+    if (callsign && callsign !== character.value?.callsign) scene?.playRemoteEmote(callsign, emote);
+  });
 }
 
 function handleCreate({ callsign, cls, model, accent, sigil, hairColor, clothingColor }) {
@@ -172,6 +176,7 @@ function mountScene() {
   });
   scene.setLocalPlayer({ ...character.value, cls: character.value.class, model: character.value.model || identity?.model });
   scene.onMove((pos) => socket.send('move', pos));
+  scene.onEmote((emote) => socket.send('emote', { emote }));
 }
 
 // ---------- solo rift ----------

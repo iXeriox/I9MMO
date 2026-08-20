@@ -79,20 +79,21 @@ function pushRoomLog(room, type, msg) {
 
 function worldSnapshot() {
   return [...sockets.values()]
-    .filter((c) => c.character)
-    .map((c) => ({
-      callsign: c.callsign,
-      class: c.character.class,
-      model: c.character.model,
-      accent: c.character.accent,
-      sigil: c.character.sigil,
-      hairColor: c.character.hairColor,
-      clothingColor: c.character.clothingColor,
-      level: c.character.level,
-      x: c.x || 0,
-      z: c.z || 0,
-      rotY: c.rotY || 0,
-    }));
+      .filter((c) => c.character)
+      .map((c) => ({
+        callsign: c.callsign,
+        class: c.character.class,
+        model: c.character.model,
+        accent: c.character.accent,
+        sigil: c.character.sigil,
+        hairColor: c.character.hairColor,
+        clothingColor: c.character.clothingColor,
+        level: c.character.level,
+        x: c.x || 0,
+        y: c.y || 0,
+        z: c.z || 0,
+        rotY: c.rotY || 0,
+      }));
 }
 
 // Broadcast world (player position) snapshot at a fixed tick rate.
@@ -154,6 +155,7 @@ wss.on('connection', (ws) => {
         case 'move': {
           if (!conn.character) return;
           conn.x = Number(msg.payload?.x) || 0;
+          conn.y = Number(msg.payload?.y) || 0;
           conn.z = Number(msg.payload?.z) || 0;
           conn.rotY = Number(msg.payload?.rotY) || 0;
           break;
@@ -192,8 +194,8 @@ wss.on('connection', (ws) => {
             }
             const def = CLASSES[character.class];
             const dmg = action === 'ability'
-              ? rollVariance(character.atk * def.abilityMult)
-              : rollVariance(character.atk);
+                ? rollVariance(character.atk * def.abilityMult)
+                : rollVariance(character.atk);
             enemy.hp = Math.max(0, enemy.hp - dmg);
             log.push({ type: 'hit', msg: action === 'ability' ? `${def.abilityName} lands for ${dmg}!` : `You strike ${enemy.name} for ${dmg}.` });
             if (action === 'ability') character.abilityCooldown = 3;
@@ -361,6 +363,15 @@ wss.on('connection', (ws) => {
           const text = String(msg.payload?.msg || '').slice(0, 240);
           if (!text) return;
           broadcast('chat', { from: conn.callsign, msg: text });
+          break;
+        }
+
+        case 'emote': {
+          if (!conn.callsign) return;
+          const allowedEmotes = ['emote-yes', 'emote-no'];
+          const emote = msg.payload?.emote;
+          if (!allowedEmotes.includes(emote)) return;
+          broadcast('emote', { callsign: conn.callsign, emote }, ws);
           break;
         }
 

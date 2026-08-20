@@ -13,5 +13,43 @@
     "abilityCooldown": 0,
     "forgeHpBuys": 20,
     "forgeAtkBuys": 31
+  },
+  "Verox": {
+    "callsign": "Verox",
+    "class": "wraithhunter",
+    "model": "character-male-c",
+    "accent": "#E9EAF4",
+    "sigil": "∆",
+    "level": 4,
+    "xp": 342,
+    "xpToNext": 343,
+    "maxHp": 150,
+    "hp": 0,
+    "atk": 23,
+    "shards": 219,
+    "abilityCooldown": 2,
+    "forgeHpBuys": 1,
+    "forgeAtkBuys": 1,
+    "hairColor": "#2B1A12",
+    "clothingColor": "#23324F"
+  },
+  "Kxrby": {
+    "callsign": "Kxrby",
+    "class": "vanguard",
+    "model": "character-male-b",
+    "accent": "#E9EAF4",
+    "sigil": "⌁",
+    "hairColor": "#5B2D80",
+    "clothingColor": "#30323A",
+    "level": 4,
+    "xp": 108,
+    "xpToNext": 343,
+    "maxHp": 176,
+    "hp": 176,
+    "atk": 17,
+    "shards": 186,
+    "abilityCooldown": 0,
+    "forgeHpBuys": 0,
+    "forgeAtkBuys": 0
   }
 }
