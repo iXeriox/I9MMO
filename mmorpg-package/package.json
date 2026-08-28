@@ -1,0 +1,20 @@
+{
+  "name": "mmorpg-package",
+  "version": "1.0.0",
+  "description": "Drop-in MMORPG engine: Node.js/Socket.IO backend + canvas client SDK. Parties, dungeons, loot, gathering, mobs, character creation.",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "NODE_ENV=development node server/index.js",
+    "gen-cert": "bash server/ssl/generate-self-signed.sh"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5",
+    "uuid": "^9.0.1"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT"
+}

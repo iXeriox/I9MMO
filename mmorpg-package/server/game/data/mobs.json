@@ -1,0 +1,71 @@
+{
+  "slime": {
+    "name": "Slime",
+    "level": 1,
+    "hp": 30,
+    "damage": 3,
+    "attackRange": 30,
+    "aggroRange": 120,
+    "moveSpeed": 60,
+    "xp": 8,
+    "color": "#5bd1a0",
+    "size": 14,
+    "lootTable": [
+      { "itemId": "slime_gel", "chance": 0.8, "min": 1, "max": 3 },
+      { "itemId": "copper_coin", "chance": 0.5, "min": 1, "max": 5 }
+    ]
+  },
+  "wolf": {
+    "name": "Wolf",
+    "level": 3,
+    "hp": 60,
+    "damage": 7,
+    "attackRange": 34,
+    "aggroRange": 160,
+    "moveSpeed": 110,
+    "xp": 18,
+    "color": "#8c8c98",
+    "size": 16,
+    "lootTable": [
+      { "itemId": "wolf_pelt", "chance": 0.65, "min": 1, "max": 2 },
+      { "itemId": "wolf_fang", "chance": 0.25, "min": 1, "max": 1 },
+      { "itemId": "copper_coin", "chance": 0.6, "min": 2, "max": 8 }
+    ]
+  },
+  "bandit": {
+    "name": "Bandit",
+    "level": 5,
+    "hp": 90,
+    "damage": 11,
+    "attackRange": 36,
+    "aggroRange": 150,
+    "moveSpeed": 90,
+    "xp": 30,
+    "color": "#c9764a",
+    "size": 16,
+    "lootTable": [
+      { "itemId": "torn_cloth", "chance": 0.7, "min": 1, "max": 3 },
+      { "itemId": "iron_dagger", "chance": 0.1, "min": 1, "max": 1 },
+      { "itemId": "silver_coin", "chance": 0.4, "min": 1, "max": 4 }
+    ]
+  },
+  "cave_troll": {
+    "name": "Cave Troll",
+    "level": 12,
+    "hp": 420,
+    "damage": 26,
+    "attackRange": 48,
+    "aggroRange": 220,
+    "moveSpeed": 70,
+    "xp": 180,
+    "color": "#6b5b3a",
+    "size": 30,
+    "isBoss": true,
+    "lootTable": [
+      { "itemId": "troll_hide", "chance": 1.0, "min": 2, "max": 4 },
+      { "itemId": "troll_club", "chance": 0.35, "min": 1, "max": 1 },
+      { "itemId": "gold_coin", "chance": 0.9, "min": 10, "max": 40 },
+      { "itemId": "rare_essence", "chance": 0.15, "min": 1, "max": 1 }
+    ]
+  }
+}

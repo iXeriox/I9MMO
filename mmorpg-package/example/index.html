@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>MMORPG Package Demo</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0d0f0d; font-family: system-ui, sans-serif; color: #eee; overflow: hidden; }
+  #game { display: block; background: #1b2a1f; }
+  .panel {
+    position: fixed; background: rgba(15,15,18,0.9); border: 1px solid #333;
+    border-radius: 8px; padding: 10px; font-size: 13px;
+  }
+  #createPanel { top: 50%; left: 50%; transform: translate(-50%,-50%); width: 320px; }
+  #createPanel h2 { margin-top: 0; }
+  #createPanel input, #createPanel select { width: 100%; margin: 4px 0 10px; padding: 6px; box-sizing: border-box; }
+  #createPanel button { width: 100%; padding: 8px; cursor: pointer; background: #3355aa; color: #fff; border: none; border-radius: 4px; }
+
+  #partyPanel { top: 10px; right: 10px; width: 200px; }
+  #dungeonPanel { top: 140px; right: 10px; width: 200px; }
+  #inventoryPanel { bottom: 10px; right: 10px; width: 220px; max-height: 240px; overflow-y: auto; }
+  #chatPanel { bottom: 10px; left: 10px; width: 320px; }
+  #chatLog { height: 100px; overflow-y: auto; margin-bottom: 6px; }
+  #chatInput { width: 70%; }
+  #chatPanel button { width: 26%; }
+  button { cursor: pointer; }
+  .item-row { display: flex; justify-content: space-between; padding: 2px 0; border-bottom: 1px solid #2a2a2a; }
+  .hidden { display: none !important; }
+  #toast { position: fixed; top: 10px; left: 50%; transform: translateX(-50%); background: #222; padding: 8px 16px; border-radius: 6px; }
+</style>
+</head>
+<body>
+
+<canvas id="game" width="1280" height="720"></canvas>
+
+<div id="createPanel" class="panel">
+  <h2>Create Your Character</h2>
+  <label>Name</label>
+  <input id="nameInput" maxlength="20" placeholder="Adventurer" />
+  <label>Class</label>
+  <select id="classInput">
+    <option value="warrior">Warrior</option>
+    <option value="mage">Mage</option>
+    <option value="ranger">Ranger</option>
+    <option value="cleric">Cleric</option>
+  </select>
+  <label>Body Color</label>
+  <input id="bodyColorInput" type="color" value="#e0b088" />
+  <label>Outfit Color</label>
+  <input id="outfitColorInput" type="color" value="#3355aa" />
+  <button id="createBtn">Enter World</button>
+</div>
+
+<div id="partyPanel" class="panel hidden">
+  <strong>Party</strong>
+  <div id="partyMembers"></div>
+  <button id="createPartyBtn">Create Party</button>
+</div>
+
+<div id="dungeonPanel" class="panel hidden">
+  <strong>Dungeons</strong>
+  <div id="dungeonList"></div>
+</div>
+
+<div id="inventoryPanel" class="panel hidden">
+  <strong>Inventory</strong>
+  <div id="inventoryList"></div>
+</div>
+
+<div id="chatPanel" class="panel hidden">
+  <div id="chatLog"></div>
+  <input id="chatInput" placeholder="Say something..." />
+  <button id="chatSendBtn">Send</button>
+</div>
+
+<div id="toast" class="hidden"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="/mmorpg-client.js"></script>
+<script>
+  const game = new MMORPGClient({
+    canvas: document.getElementById('game'),
+    serverUrl: window.location.origin
+  });
+
+  function toast(msg, ms = 2500) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    clearTimeout(toast._t);
+    toast._t = setTimeout(() => el.classList.add('hidden'), ms);
+  }
+
+  game.on('character_creation_needed', () => {
+    document.getElementById('createPanel').classList.remove('hidden');
+  });
+
+  document.getElementById('createBtn').addEventListener('click', () => {
+    game.createCharacter({
+      name: document.getElementById('nameInput').value || 'Adventurer',
+      className: document.getElementById('classInput').value,
+      appearance: {
+        bodyColor: document.getElementById('bodyColorInput').value,
+        outfitColor: document.getElementById('outfitColorInput').value
+      }
+    });
+  });
+
+  game.on('character_created', () => {
+    document.getElementById('createPanel').classList.add('hidden');
+    ['partyPanel', 'dungeonPanel', 'inventoryPanel', 'chatPanel'].forEach(id =>
+      document.getElementById(id).classList.remove('hidden'));
+    game.listDungeons();
+  });
+
+  game.on('level_up', ({ level }) => toast(`Level up! You are now level ${level}`));
+  game.on('xp_gain', ({ amount }) => toast(`+${amount} XP`, 1000));
+  game.on('player_died', () => toast('You died. Respawning in 5s...'));
+  game.on('player_respawned', () => toast('Respawned!'));
+  game.on('error_message', (msg) => toast(msg));
+
+  game.on('inventory_update', renderInventory);
+  game.on('player_update', () => renderInventory(game.state.me.inventory));
+  function renderInventory(inv) {
+    const el = document.getElementById('inventoryList');
+    el.innerHTML = '';
+    (inv || []).forEach(slot => {
+      const row = document.createElement('div');
+      row.className = 'item-row';
+      row.innerHTML = `<span>${slot.def ? slot.def.name : slot.itemId}</span><span>x${slot.qty}</span>`;
+      if (slot.def && slot.def.slot) {
+        const btn = document.createElement('button');
+        btn.textContent = 'Equip';
+        btn.onclick = () => game.equipItem(slot.itemId);
+        row.appendChild(btn);
+      }
+      el.appendChild(row);
+    });
+  }
+
+  document.getElementById('createPartyBtn').addEventListener('click', () => game.partyCreate());
+  game.on('party_update', (party) => {
+    const el = document.getElementById('partyMembers');
+    if (!party) { el.innerHTML = '<em>No party</em>'; return; }
+    el.innerHTML = party.members.map(m => `${m.name} (Lv${m.level}) - ${Math.round(m.hp)}hp`).join('<br>');
+  });
+  game.on('party_invite', ({ partyId, fromName }) => {
+    if (confirm(`${fromName} invited you to their party. Accept?`)) game.partyAccept(partyId);
+  });
+
+  game.on('dungeon_list', (list) => {
+    const el = document.getElementById('dungeonList');
+    el.innerHTML = '';
+    list.forEach(d => {
+      const btn = document.createElement('button');
+      btn.textContent = `${d.name} (Lv${d.minLevel}+)`;
+      btn.style.display = 'block';
+      btn.style.width = '100%';
+      btn.style.marginBottom = '4px';
+      btn.onclick = () => game.enterDungeon(d.key);
+      el.appendChild(btn);
+    });
+    const leaveBtn = document.createElement('button');
+    leaveBtn.textContent = 'Leave Dungeon';
+    leaveBtn.style.width = '100%';
+    leaveBtn.onclick = () => game.leaveDungeon();
+    el.appendChild(leaveBtn);
+  });
+  game.on('dungeon_entered', (instance) => toast(`Entered ${instance.name}`));
+  game.on('dungeon_event', (evt) => {
+    if (evt.type === 'wave_cleared') toast('Wave cleared!');
+    if (evt.type === 'dungeon_complete') toast('Dungeon complete!');
+  });
+  game.on('dungeon_reward', ({ drops }) => {
+    toast(`Loot: ${drops.map(d => `${d.itemId} x${d.qty}`).join(', ')}`);
+  });
+
+  function appendChat(msg) {
+    const el = document.getElementById('chatLog');
+    const line = document.createElement('div');
+    line.textContent = `[${msg.channel}] ${msg.from}: ${msg.message}`;
+    el.appendChild(line);
+    el.scrollTop = el.scrollHeight;
+  }
+  game.on('chat_message', appendChat);
+  document.getElementById('chatSendBtn').addEventListener('click', sendChat);
+  document.getElementById('chatInput').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(); });
+  function sendChat() {
+    const input = document.getElementById('chatInput');
+    if (input.value.trim()) { game.sendChat(input.value.trim()); input.value = ''; }
+  }
+
+  game.connect();
+</script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+{
+  "copper_coin": { "name": "Copper Coin", "type": "currency", "stack": 999, "icon": "coin_copper" },
+  "silver_coin": { "name": "Silver Coin", "type": "currency", "stack": 999, "icon": "coin_silver" },
+  "gold_coin": { "name": "Gold Coin", "type": "currency", "stack": 999, "icon": "coin_gold" },
+
+  "slime_gel": { "name": "Slime Gel", "type": "material", "stack": 99, "icon": "gel" },
+  "wolf_pelt": { "name": "Wolf Pelt", "type": "material", "stack": 99, "icon": "pelt" },
+  "wolf_fang": { "name": "Wolf Fang", "type": "material", "stack": 99, "icon": "fang" },
+  "torn_cloth": { "name": "Torn Cloth", "type": "material", "stack": 99, "icon": "cloth" },
+  "troll_hide": { "name": "Troll Hide", "type": "material", "stack": 99, "icon": "hide" },
+  "rare_essence": { "name": "Rare Essence", "type": "material", "stack": 99, "icon": "essence", "rarity": "rare" },
+
+  "wood_log": { "name": "Wood Log", "type": "material", "stack": 99, "icon": "log", "gatherSkill": "woodcutting" },
+  "iron_ore": { "name": "Iron Ore", "type": "material", "stack": 99, "icon": "ore", "gatherSkill": "mining" },
+  "herb_sprig": { "name": "Herb Sprig", "type": "material", "stack": 99, "icon": "herb", "gatherSkill": "herbalism" },
+
+  "iron_dagger": {
+    "name": "Iron Dagger", "type": "weapon", "stack": 1, "icon": "dagger",
+    "slot": "mainHand", "damage": 6, "rarity": "uncommon"
+  },
+  "troll_club": {
+    "name": "Troll Club", "type": "weapon", "stack": 1, "icon": "club",
+    "slot": "mainHand", "damage": 22, "rarity": "epic"
+  },
+  "starter_sword": {
+    "name": "Starter Sword", "type": "weapon", "stack": 1, "icon": "sword",
+    "slot": "mainHand", "damage": 4, "rarity": "common"
+  }
+}

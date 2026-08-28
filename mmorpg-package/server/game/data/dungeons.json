@@ -1,0 +1,20 @@
+{
+  "wolfden_cavern": {
+    "name": "Wolfden Cavern",
+    "minLevel": 2,
+    "maxPlayers": 5,
+    "width": 1600,
+    "height": 1200,
+    "waves": [
+      { "mobType": "wolf", "count": 4 },
+      { "mobType": "wolf", "count": 6 },
+      { "mobType": "bandit", "count": 3 }
+    ],
+    "boss": { "mobType": "cave_troll", "count": 1 },
+    "rewardTable": [
+      { "itemId": "gold_coin", "chance": 1.0, "min": 20, "max": 60 },
+      { "itemId": "iron_dagger", "chance": 0.2, "min": 1, "max": 1 },
+      { "itemId": "rare_essence", "chance": 0.1, "min": 1, "max": 1 }
+    ]
+  }
+}
