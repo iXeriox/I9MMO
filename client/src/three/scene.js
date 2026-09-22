@@ -359,6 +359,7 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
         training: { ...makePortal(0xf4c868, -14, 9), id: 'training' },
         arcade: { ...makePortal(0x5a8cff, 14, 9), id: 'arcade' },
         battleship: { ...makePortal(0x43b5ff, 15, -15), id: 'battleship' },
+        quests: { ...makePortal(0xffb84f, -15, -15), id: 'quests' },
     };
 
     const portalSignage = {
@@ -367,6 +368,7 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
         training: 'COMBAT TRAINING',
         arcade: 'ARCADE',
         battleship: 'BATTLE SHIPS',
+        quests: 'QUEST BOARD',
     };
     for (const key of Object.keys(portals)) {
         const sign = makeLabel(portalSignage[key]);
@@ -895,7 +897,7 @@ export function createRiftScene(container, { onPortalChange, onInteract } = {}) 
             e.preventDefault();
             jumpQueued = true;
         }
-        if (k === 'f' && !e.repeat && activePortal && ['training', 'arcade', 'battleship'].includes(activePortal)) {
+        if (k === 'f' && !e.repeat && activePortal && ['training', 'arcade', 'battleship', 'quests'].includes(activePortal)) {
             onInteract?.(activePortal);
         }
         if ((k === '1' || k === '2') && !e.repeat && localAvatar) {

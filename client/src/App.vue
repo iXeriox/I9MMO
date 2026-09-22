@@ -11,6 +11,7 @@
         :chat="chat"
         :leaderboard="leaderboard"
         :show-leaderboard="overlay === 'leaderboard-pin'"
+        :active-quests="questLog.active"
         @open-solo="openSolo"
         @open-room="overlay = 'room'"
         @open-forge="overlay = 'forge'"
@@ -54,6 +55,16 @@
 
     <ArcadePanel v-if="overlay === 'arcade'" @close="overlay = null" />
     <BattleshipPanel v-if="overlay === 'battleship'" @close="overlay = null" />
+
+    <QuestPanel
+        v-if="overlay === 'quests'"
+        :available="questLog.available"
+        :active="questLog.active"
+        :completed="questLog.completed"
+        @accept="acceptQuest"
+        @turn-in="turnInQuest"
+        @close="overlay = null"
+    />
   </template>
 </template>
 
@@ -66,6 +77,7 @@ import RoomPanel from './components/RoomPanel.vue';
 import ForgePanel from './components/ForgePanel.vue';
 import ArcadePanel from './components/ArcadePanel.vue';
 import BattleshipPanel from './components/BattleshipPanel.vue';
+import QuestPanel from './components/QuestPanel.vue';
 import { createGameSocket } from './net/socket.js';
 import { createRiftScene } from './three/scene.js';
 
@@ -73,7 +85,7 @@ const character = ref(null);
 const createError = ref('');
 const connected = ref(false);
 const activePortal = ref(null);
-const overlay = ref(null); // null | 'combat' | 'room' | 'forge'
+const overlay = ref(null); // null | 'combat' | 'room' | 'forge' | 'arcade' | 'battleship' | 'quests' | 'leaderboard-pin'
 const chat = ref([]);
 const leaderboard = ref([]);
 
@@ -88,6 +100,8 @@ const roomError = ref('');
 const attackCooldown = ref(0);
 const rewardClaimed = ref(false);
 let cooldownTimer = null;
+
+const questLog = reactive({ available: [], active: [], completed: [] });
 
 const sceneContainer = ref(null);
 let scene = null;
@@ -158,6 +172,12 @@ function connectSocket() {
   socket.on('emote', ({ callsign, emote }) => {
     if (callsign && callsign !== character.value?.callsign) scene?.playRemoteEmote(callsign, emote);
   });
+
+  socket.on('quest_state', (log) => {
+    questLog.available = log.available || [];
+    questLog.active = log.active || [];
+    questLog.completed = log.completed || [];
+  });
 }
 
 function handleCreate({ callsign, cls, model, accent, sigil, hairColor, clothingColor }) {
@@ -175,6 +195,7 @@ function mountScene() {
       if (area === 'training') openTraining();
       if (area === 'arcade') overlay.value = 'arcade';
       if (area === 'battleship') overlay.value = 'battleship';
+      if (area === 'quests') overlay.value = 'quests';
     },
   });
   scene.setLocalPlayer({ ...character.value, cls: character.value.class, model: character.value.model || identity?.model });
@@ -247,6 +268,14 @@ function roomAttack() {
 }
 function claimReward() {
   socket.send('claim_reward');
+}
+
+// ---------- quests ----------
+function acceptQuest(questId) {
+  socket.send('accept_quest', { questId });
+}
+function turnInQuest(questId) {
+  socket.send('turn_in_quest', { questId });
 }
 
 // ---------- chat / leaderboard ----------

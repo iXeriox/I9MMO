@@ -55,7 +55,25 @@ the server needs to change since all reads/writes go through that module.
 ## Protocol
 
 WebSocket messages are `{ type, payload }` JSON. See `src/index.js` for the
-full list of message types (`hello`, `move`, `enter_solo`, `solo_action`,
-`forge`, `create_room`, `join_room`, `room_attack`, `claim_reward`, `chat`)
+full list of message types (`hello`, `move`, `enter_solo`, `enter_training`, `solo_action`,
+`forge`, `customize`, `create_room`, `join_room`, `leave_room`, `room_attack`, `claim_reward`,
+`accept_quest`, `abandon_quest`, `turn_in_quest`, `chat`, `emote`)
 and what the server broadcasts back (`welcome`, `world_state`, `solo_state`,
-`character_state`, `room_state`, `chat`, `error`).
+`character_state`, `room_state`, `quest_state`, `chat`, `emote`, `error`).
+
+## Quests
+
+`src/quests.js` is a self-contained module — quest definitions, per-character
+state (`character.quests = { active, completed }`), and the accept / progress /
+turn-in logic all live there, independent of everything else. Add a new quest
+by appending an entry to the `QUESTS` array (`type` is one of `kill`,
+`training_win`, `forge`, `boss`, `level`; set `filter` to a monster name to
+scope a `kill` quest to one enemy; set `requires` to an array of prerequisite
+quest ids; set `repeatable: true` for a standing bounty).
+
+Gameplay events that feed the quest engine are called out explicitly in
+`src/index.js` via `applyQuestProgress(...)` — search for that name to see
+every hook point (defeating an enemy, winning a training bout, buying a Forge
+upgrade, downing an instance boss, leveling up). Characters saved before this
+system existed are migrated automatically and losslessly the next time they
+connect (`ensureQuestState` in `quests.js`, called from the `hello` handler).

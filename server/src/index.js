@@ -9,6 +9,7 @@ import { fileURLToPath } from 'url';
 
 import { CLASSES, newCharacter, grantXp, spawnEnemy, rollVariance, randCode } from './data.js';
 import { loadStore, getCharacter, saveCharacter, leaderboard } from './store.js';
+import { ensureQuestState, getQuestLog, acceptQuest, abandonQuest, turnInQuest, progressQuests } from './quests.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const PORT = process.env.PORT || 8443;
@@ -28,10 +29,19 @@ if (fs.existsSync(CLIENT_DIST)) {
 // Provide SSL_KEY_PATH + SSL_CERT_PATH (and optional SSL_CA_PATH) to serve real TLS.
 // Falls back to plain HTTP for local development if no certs are configured.
 function createServer() {
-  const keyPath = '/infini9/secure/_.infini9.net_private_key.key';
-  const certPath = '/infini9/secure/infini9.net_ssl_certificate.cer';
+  // Legacy fallback paths kept for this deployment's existing box in case
+  // SSL_KEY_PATH/SSL_CERT_PATH aren't set in the environment.
+  const LEGACY_KEY_PATH = '/infini9/secure/_.infini9.net_private_key.key';
+  const LEGACY_CERT_PATH = '/infini9/secure/infini9.net_ssl_certificate.cer';
 
-  if (keyPath && certPath && fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+  const keyPath = process.env.SSL_KEY_PATH && fs.existsSync(process.env.SSL_KEY_PATH)
+    ? process.env.SSL_KEY_PATH
+    : (fs.existsSync(LEGACY_KEY_PATH) ? LEGACY_KEY_PATH : null);
+  const certPath = process.env.SSL_CERT_PATH && fs.existsSync(process.env.SSL_CERT_PATH)
+    ? process.env.SSL_CERT_PATH
+    : (fs.existsSync(LEGACY_CERT_PATH) ? LEGACY_CERT_PATH : null);
+
+  if (keyPath && certPath) {
     const options = {
       key: fs.readFileSync(keyPath),
       cert: fs.readFileSync(certPath),
@@ -75,6 +85,21 @@ function broadcastRoom(room) {
 function pushRoomLog(room, type, msg) {
   room.log.push({ type, msg });
   if (room.log.length > 25) room.log = room.log.slice(-25);
+}
+
+function sendQuestState(ws, character) {
+  send(ws, 'quest_state', getQuestLog(character));
+}
+
+// Runs a gameplay event through the quest engine and appends "objective
+// ready" notices to the given combat/room log array. Also rolls a 'level'
+// event through in case the event itself caused a level-up.
+function applyQuestProgress(character, eventType, payload, log) {
+  const ready = progressQuests(character, eventType, payload);
+  for (const id of ready) {
+    log?.push({ type: 'system', msg: `Quest objective complete — return to the Quest Board to turn it in.` });
+  }
+  return ready;
 }
 
 function worldSnapshot() {
@@ -145,10 +170,12 @@ wss.on('connection', (ws) => {
           if (!character.sigil) character.sigil = sigil;
           if (!character.hairColor) character.hairColor = hairColor;
           if (!character.clothingColor) character.clothingColor = clothingColor;
+          ensureQuestState(character);
           saveCharacter(character);
           conn.callsign = callsign;
           conn.character = character;
           send(ws, 'welcome', { character, leaderboard: leaderboard() });
+          sendQuestState(ws, character);
           broadcast('chat', { from: 'network', msg: `${callsign} tuned into Infini9.` }, ws);
           break;
         }
@@ -207,11 +234,14 @@ wss.on('connection', (ws) => {
               if (conn.training) {
                 character.hp = conn.trainingStartHp;
                 log.push({ type: 'system', msg: 'Simulation complete. Live combat telemetry recorded; health restored.' });
+                applyQuestProgress(character, 'training_win', {}, log);
               } else {
                 character.shards += enemy.shardReward;
                 const leveled = grantXp(character, enemy.xpReward);
                 log.push({ type: 'system', msg: `+${enemy.xpReward} XP, +${enemy.shardReward} shards.` });
                 if (leveled) log.push({ type: 'system', msg: `Level up! You are now level ${character.level}.` });
+                applyQuestProgress(character, 'kill', { monster: enemy.name }, log);
+                if (leveled) applyQuestProgress(character, 'level', {}, log);
               }
               over = true;
             } else {
@@ -243,6 +273,7 @@ wss.on('connection', (ws) => {
           if (over && conn.training) character.hp = conn.trainingStartHp;
           if (over) saveCharacter(character);
           send(ws, 'solo_state', { character, enemy, log, over });
+          if (over) sendQuestState(ws, character);
           break;
         }
 
@@ -264,8 +295,10 @@ wss.on('connection', (ws) => {
             character.atk += 2;
             character.forgeAtkBuys = (character.forgeAtkBuys || 0) + 1;
           }
+          applyQuestProgress(character, 'forge', {});
           saveCharacter(character);
           send(ws, 'character_state', { character });
+          sendQuestState(ws, character);
           break;
         }
 
@@ -355,11 +388,47 @@ wss.on('connection', (ws) => {
           const gainedShards = 70 + Math.round(room.bossMaxHp / 4);
           conn.character.shards += gainedShards;
           const leveled = grantXp(conn.character, gainedXp);
+          applyQuestProgress(conn.character, 'boss', {});
+          if (leveled) applyQuestProgress(conn.character, 'level', {});
           saveCharacter(conn.character);
           room.rewardClaimed[conn.callsign] = true;
           pushRoomLog(room, 'system', `${conn.callsign} claimed the reward (+${gainedXp} XP, +${gainedShards} shards).`);
           broadcastRoom(room);
           send(ws, 'character_state', { character: conn.character, leveled });
+          sendQuestState(ws, conn.character);
+          break;
+        }
+
+        case 'accept_quest': {
+          if (!conn.character) return;
+          const result = acceptQuest(conn.character, String(msg.payload?.questId || ''));
+          if (!result.ok) return send(ws, 'error', { message: result.message });
+          saveCharacter(conn.character);
+          sendQuestState(ws, conn.character);
+          break;
+        }
+
+        case 'abandon_quest': {
+          if (!conn.character) return;
+          const result = abandonQuest(conn.character, String(msg.payload?.questId || ''));
+          if (!result.ok) return send(ws, 'error', { message: result.message });
+          saveCharacter(conn.character);
+          sendQuestState(ws, conn.character);
+          break;
+        }
+
+        case 'turn_in_quest': {
+          if (!conn.character) return;
+          const questId = String(msg.payload?.questId || '');
+          const result = turnInQuest(conn.character, questId);
+          if (!result.ok) return send(ws, 'error', { message: result.message });
+          conn.character.shards += result.rewardShards;
+          const leveled = result.rewardXp > 0 ? grantXp(conn.character, result.rewardXp) : false;
+          if (leveled) applyQuestProgress(conn.character, 'level', {});
+          saveCharacter(conn.character);
+          send(ws, 'character_state', { character: conn.character, leveled });
+          broadcast('chat', { from: 'network', msg: `${conn.callsign} completed "${result.title}" (+${result.rewardXp} XP, +${result.rewardShards} shards).` });
+          sendQuestState(ws, conn.character);
           break;
         }
 
@@ -397,6 +466,6 @@ wss.on('connection', (ws) => {
 });
 
 await loadStore();
-server.listen(8443, '0.0.0.0', () => {
-  console.log('Server listening on 0.0.0.0:8443');
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server listening on 0.0.0.0:${PORT}`);
 });

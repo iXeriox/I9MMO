@@ -43,6 +43,15 @@
       </div>
     </div>
 
+    <!-- active quest tracker -->
+    <div v-if="activeQuests.length" class="panel quest-tracker">
+      <div class="mono label">ACTIVE QUESTS</div>
+      <div v-for="q in activeQuests.slice(0,3)" :key="q.id" class="tracker-row" :class="{ ready: q.readyToTurnIn }">
+        <div class="tracker-head"><span>{{ q.title }}</span><span class="mono">{{ Math.min(q.progress,q.target) }}/{{ q.target }}</span></div>
+        <div class="bar-track"><div class="bar-fill quest" :style="{ width: pct(q.progress, q.target) + '%' }"></div></div>
+      </div>
+    </div>
+
     <!-- portal prompt -->
     <div v-if="activePortal" class="portal-prompt panel">
       <span class="mono">{{ portalMeta.label }}</span>
@@ -76,6 +85,7 @@ const props = defineProps({
   chat: { type: Array, default: () => [] },
   leaderboard: { type: Array, default: () => [] },
   showLeaderboard: { type: Boolean, default: false },
+  activeQuests: { type: Array, default: () => [] },
 });
 const emit = defineEmits(['open-solo', 'open-room', 'toggle-leaderboard', 'send-chat', 'open-forge']);
 const portalMeta = computed(() => ({
@@ -84,6 +94,7 @@ const portalMeta = computed(() => ({
   training: { label: 'COMBAT SIMULATOR', action: 'Press F nearby' },
   arcade: { label: 'ORBITAL ARCADE', action: 'Press F nearby' },
   battleship: { label: 'BATTLE SHIPS', action: 'Press F to play' },
+  quests: { label: 'QUEST BOARD', action: 'Press F to view' },
 }[props.activePortal] || { label: '', action: '' }));
 function activatePortal() {
   if (props.activePortal === 'solo') emit('open-solo');
@@ -138,6 +149,13 @@ watch(() => props.chat.length, () => {
 .leaderboard .row:last-child { border-bottom: none; }
 .leaderboard .rank { color: var(--text-faint); margin-right: 4px; }
 .leaderboard .empty { font-size: 11px; color: var(--text-faint); }
+
+.quest-tracker { position: absolute; bottom: 16px; right: 16px; width: 230px; padding: 12px 14px; }
+.tracker-row { margin-top: 8px; }
+.tracker-row:first-of-type { margin-top: 6px; }
+.tracker-head { display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 4px; }
+.tracker-row.ready .tracker-head span:first-child { color: var(--accent); }
+.bar-fill.quest { background: linear-gradient(90deg, var(--accent), var(--accent2)); }
 
 .portal-prompt {
   position: absolute; bottom: 130px; left: 50%; transform: translateX(-50%);

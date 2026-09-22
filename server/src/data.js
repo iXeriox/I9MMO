@@ -1,3 +1,5 @@
+import { initQuestState } from './quests.js';
+
 export const CLASSES = {
   vanguard: { name: 'Vanguard', role: 'Tank / Melee', baseHp: 140, baseAtk: 11, abilityName: 'Bulwark Smash', abilityMult: 2.1 },
   phasecaller: { name: 'Phasecaller', role: 'Arcane DPS', baseHp: 88, baseAtk: 19, abilityName: 'Rift Bolt', abilityMult: 2.3 },
@@ -47,6 +49,7 @@ export function newCharacter(callsign, cls, model, accent, sigil, hairColor, clo
     abilityCooldown: 0,
     forgeHpBuys: 0,
     forgeAtkBuys: 0,
+    quests: initQuestState(),
   };
 }
 

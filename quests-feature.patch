@@ -1,0 +1,671 @@
+diff -ruN '--exclude=node_modules' '--exclude=dist' '--exclude=.DS_Store' '--exclude=package-lock.json' '--exclude=characters.json' original/repo/client/src/App.vue repo/client/src/App.vue
+--- original/repo/client/src/App.vue	2026-08-20 21:09:58.000000000 +0000
++++ repo/client/src/App.vue	2026-09-22 08:06:20.556746092 +0000
+@@ -11,6 +11,7 @@
+         :chat="chat"
+         :leaderboard="leaderboard"
+         :show-leaderboard="overlay === 'leaderboard-pin'"
++        :active-quests="questLog.active"
+         @open-solo="openSolo"
+         @open-room="overlay = 'room'"
+         @open-forge="overlay = 'forge'"
+@@ -54,6 +55,16 @@
+
+     <ArcadePanel v-if="overlay === 'arcade'" @close="overlay = null" />
+     <BattleshipPanel v-if="overlay === 'battleship'" @close="overlay = null" />
++
++    <QuestPanel
++        v-if="overlay === 'quests'"
++        :available="questLog.available"
++        :active="questLog.active"
++        :completed="questLog.completed"
++        @accept="acceptQuest"
++        @turn-in="turnInQuest"
++        @close="overlay = null"
++    />
+   </template>
+ </template>
+
+@@ -66,6 +77,7 @@
+ import ForgePanel from './components/ForgePanel.vue';
+ import ArcadePanel from './components/ArcadePanel.vue';
+ import BattleshipPanel from './components/BattleshipPanel.vue';
++import QuestPanel from './components/QuestPanel.vue';
+ import { createGameSocket } from './net/socket.js';
+ import { createRiftScene } from './three/scene.js';
+
+@@ -73,7 +85,7 @@
+ const createError = ref('');
+ const connected = ref(false);
+ const activePortal = ref(null);
+-const overlay = ref(null); // null | 'combat' | 'room' | 'forge'
++const overlay = ref(null); // null | 'combat' | 'room' | 'forge' | 'arcade' | 'battleship' | 'quests' | 'leaderboard-pin'
+ const chat = ref([]);
+ const leaderboard = ref([]);
+
+@@ -89,6 +101,8 @@
+ const rewardClaimed = ref(false);
+ let cooldownTimer = null;
+
++const questLog = reactive({ available: [], active: [], completed: [] });
++
+ const sceneContainer = ref(null);
+ let scene = null;
+ let socket = null;
+@@ -158,6 +172,12 @@
+   socket.on('emote', ({ callsign, emote }) => {
+     if (callsign && callsign !== character.value?.callsign) scene?.playRemoteEmote(callsign, emote);
+   });
++
++  socket.on('quest_state', (log) => {
++    questLog.available = log.available || [];
++    questLog.active = log.active || [];
++    questLog.completed = log.completed || [];
++  });
+ }
+
+ function handleCreate({ callsign, cls, model, accent, sigil, hairColor, clothingColor }) {
+@@ -175,6 +195,7 @@
+       if (area === 'training') openTraining();
+       if (area === 'arcade') overlay.value = 'arcade';
+       if (area === 'battleship') overlay.value = 'battleship';
++      if (area === 'quests') overlay.value = 'quests';
+     },
+   });
+   scene.setLocalPlayer({ ...character.value, cls: character.value.class, model: character.value.model || identity?.model });
+@@ -249,6 +270,14 @@
+   socket.send('claim_reward');
+ }
+
++// ---------- quests ----------
++function acceptQuest(questId) {
++  socket.send('accept_quest', { questId });
++}
++function turnInQuest(questId) {
++  socket.send('turn_in_quest', { questId });
++}
++
+ // ---------- chat / leaderboard ----------
+ function sendChat(msg) {
+   socket.send('chat', { msg });
+diff -ruN '--exclude=node_modules' '--exclude=dist' '--exclude=.DS_Store' '--exclude=package-lock.json' '--exclude=characters.json' original/repo/client/src/components/HUD.vue repo/client/src/components/HUD.vue
+--- original/repo/client/src/components/HUD.vue	2026-08-20 21:09:58.000000000 +0000
++++ repo/client/src/components/HUD.vue	2026-09-22 08:03:24.953229380 +0000
+@@ -43,6 +43,15 @@
+       </div>
+     </div>
+
++    <!-- active quest tracker -->
++    <div v-if="activeQuests.length" class="panel quest-tracker">
++      <div class="mono label">ACTIVE QUESTS</div>
++      <div v-for="q in activeQuests.slice(0,3)" :key="q.id" class="tracker-row" :class="{ ready: q.readyToTurnIn }">
++        <div class="tracker-head"><span>{{ q.title }}</span><span class="mono">{{ Math.min(q.progress,q.target) }}/{{ q.target }}</span></div>
++        <div class="bar-track"><div class="bar-fill quest" :style="{ width: pct(q.progress, q.target) + '%' }"></div></div>
++      </div>
++    </div>
++
+     <!-- portal prompt -->
+     <div v-if="activePortal" class="portal-prompt panel">
+       <span class="mono">{{ portalMeta.label }}</span>
+@@ -76,6 +85,7 @@
+   chat: { type: Array, default: () => [] },
+   leaderboard: { type: Array, default: () => [] },
+   showLeaderboard: { type: Boolean, default: false },
++  activeQuests: { type: Array, default: () => [] },
+ });
+ const emit = defineEmits(['open-solo', 'open-room', 'toggle-leaderboard', 'send-chat', 'open-forge']);
+ const portalMeta = computed(() => ({
+@@ -84,6 +94,7 @@
+   training: { label: 'COMBAT SIMULATOR', action: 'Press F nearby' },
+   arcade: { label: 'ORBITAL ARCADE', action: 'Press F nearby' },
+   battleship: { label: 'BATTLE SHIPS', action: 'Press F to play' },
++  quests: { label: 'QUEST BOARD', action: 'Press F to view' },
+ }[props.activePortal] || { label: '', action: '' }));
+ function activatePortal() {
+   if (props.activePortal === 'solo') emit('open-solo');
+@@ -139,6 +150,13 @@
+ .leaderboard .rank { color: var(--text-faint); margin-right: 4px; }
+ .leaderboard .empty { font-size: 11px; color: var(--text-faint); }
+
++.quest-tracker { position: absolute; bottom: 16px; right: 16px; width: 230px; padding: 12px 14px; }
++.tracker-row { margin-top: 8px; }
++.tracker-row:first-of-type { margin-top: 6px; }
++.tracker-head { display: flex; justify-content: space-between; font-size: 11.5px; margin-bottom: 4px; }
++.tracker-row.ready .tracker-head span:first-child { color: var(--accent); }
++.bar-fill.quest { background: linear-gradient(90deg, var(--accent), var(--accent2)); }
++
+ .portal-prompt {
+   position: absolute; bottom: 130px; left: 50%; transform: translateX(-50%);
+   display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+diff -ruN '--exclude=node_modules' '--exclude=dist' '--exclude=.DS_Store' '--exclude=package-lock.json' '--exclude=characters.json' original/repo/client/src/components/QuestPanel.vue repo/client/src/components/QuestPanel.vue
+--- original/repo/client/src/components/QuestPanel.vue	1970-01-01 00:00:00.000000000 +0000
++++ repo/client/src/components/QuestPanel.vue	2026-09-22 08:02:43.985526004 +0000
+@@ -0,0 +1,78 @@
++<template>
++  <div class="overlay">
++    <div class="panel box">
++      <div class="mono label">QUEST BOARD</div>
++      <div class="display" style="font-size:19px; margin-bottom:4px;">Archivist Kade's Postings</div>
++      <div class="mono" style="font-size:11px; color:var(--text-faint); margin-bottom:14px;">
++        Objectives track automatically as you play. Return here to turn them in.
++      </div>
++
++      <div v-if="active.length" class="mono section-label">ACTIVE</div>
++      <div v-for="q in active" :key="'a-'+q.id" class="quest-card" :class="{ ready: q.readyToTurnIn }">
++        <div class="quest-head">
++          <b>{{ q.title }}</b>
++          <span class="mono progress">{{ Math.min(q.progress, q.target) }}/{{ q.target }}</span>
++        </div>
++        <div class="sub">{{ q.description }}</div>
++        <div class="bar-track" style="margin:8px 0;"><div class="bar-fill quest" :style="{ width: pct(q.progress, q.target) + '%' }"></div></div>
++        <div class="quest-actions">
++          <span class="mono reward">+{{ q.rewardXp }} XP · ◈{{ q.rewardShards }}</span>
++          <button class="btn btn-primary" :disabled="!q.readyToTurnIn" @click="$emit('turn-in', q.id)">
++            {{ q.readyToTurnIn ? 'Turn in' : 'In progress' }}
++          </button>
++        </div>
++      </div>
++
++      <div class="mono section-label">AVAILABLE</div>
++      <div v-if="available.length===0" class="mono empty">No new postings — check back after levelling up or finishing what you've got.</div>
++      <div v-for="q in available" :key="'v-'+q.id" class="quest-card">
++        <div class="quest-head">
++          <b>{{ q.title }}</b>
++          <span v-if="q.repeatable" class="mono repeat-tag">REPEATABLE</span>
++        </div>
++        <div class="sub">{{ q.description }}</div>
++        <div class="quest-actions">
++          <span class="mono reward">+{{ q.rewardXp }} XP · ◈{{ q.rewardShards }}</span>
++          <button class="btn" @click="$emit('accept', q.id)">Accept</button>
++        </div>
++      </div>
++
++      <div v-if="completed.length" class="mono section-label">COMPLETED</div>
++      <div v-if="completed.length" class="completed-row">
++        <span v-for="c in completed" :key="c.id" class="mono completed-chip">{{ c.title }}<span v-if="c.count>1"> ×{{ c.count }}</span></span>
++      </div>
++
++      <button class="btn btn-block" style="margin-top:16px;" @click="$emit('close')">← Back</button>
++    </div>
++  </div>
++</template>
++
++<script setup>
++defineProps({
++  available: { type: Array, default: () => [] },
++  active: { type: Array, default: () => [] },
++  completed: { type: Array, default: () => [] },
++});
++defineEmits(['accept', 'turn-in', 'close']);
++function pct(v, max) { if (!max) return 0; return Math.max(0, Math.min(100, Math.round((v / max) * 100))); }
++</script>
++
++<style scoped>
++.overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(5,6,10,0.55); z-index: 20; }
++.box { width: 480px; max-width: 92vw; max-height: 88vh; overflow-y: auto; }
++.label { font-size: 10.5px; color: var(--text-faint); letter-spacing: 0.12em; }
++.section-label { font-size: 10.5px; color: var(--text-faint); letter-spacing: 0.12em; margin: 16px 0 8px; }
++.section-label:first-of-type { margin-top: 4px; }
++.empty { font-size: 11.5px; color: var(--text-faint); padding: 6px 0 4px; }
++.quest-card { background: var(--bg-grid); border: 1px solid var(--border-soft); border-radius: 10px; padding: 12px 14px; margin-bottom: 10px; }
++.quest-card.ready { border-color: var(--accent); box-shadow: 0 0 0 1px rgba(79,227,193,0.15) inset; }
++.quest-head { display: flex; justify-content: space-between; align-items: center; }
++.progress { font-size: 11px; color: var(--text-dim); }
++.sub { font-size: 12px; color: var(--text-dim); margin-top: 4px; line-height: 1.4; }
++.quest-actions { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; }
++.reward { font-size: 11px; color: var(--gold); }
++.repeat-tag { font-size: 9px; color: var(--accent2); border: 1px solid var(--accent2); border-radius: 5px; padding: 1px 6px; }
++.bar-fill.quest { background: linear-gradient(90deg, var(--accent), var(--accent2)); }
++.completed-row { display: flex; flex-wrap: wrap; gap: 6px; }
++.completed-chip { font-size: 10.5px; color: var(--text-dim); background: var(--bg-grid); border: 1px solid var(--border-soft); border-radius: 99px; padding: 4px 10px; }
++</style>
+diff -ruN '--exclude=node_modules' '--exclude=dist' '--exclude=.DS_Store' '--exclude=package-lock.json' '--exclude=characters.json' original/repo/client/src/three/scene.js repo/client/src/three/scene.js
+--- original/repo/client/src/three/scene.js	2026-08-20 21:09:58.000000000 +0000
++++ repo/client/src/three/scene.js	2026-09-22 08:02:55.561574890 +0000
+@@ -359,6 +359,7 @@
+         training: { ...makePortal(0xf4c868, -14, 9), id: 'training' },
+         arcade: { ...makePortal(0x5a8cff, 14, 9), id: 'arcade' },
+         battleship: { ...makePortal(0x43b5ff, 15, -15), id: 'battleship' },
++        quests: { ...makePortal(0xffb84f, -15, -15), id: 'quests' },
+     };
+
+     const portalSignage = {
+@@ -367,6 +368,7 @@
+         training: 'COMBAT TRAINING',
+         arcade: 'ARCADE',
+         battleship: 'BATTLE SHIPS',
++        quests: 'QUEST BOARD',
+     };
+     for (const key of Object.keys(portals)) {
+         const sign = makeLabel(portalSignage[key]);
+@@ -895,7 +897,7 @@
+             e.preventDefault();
+             jumpQueued = true;
+         }
+-        if (k === 'f' && !e.repeat && activePortal && ['training', 'arcade', 'battleship'].includes(activePortal)) {
++        if (k === 'f' && !e.repeat && activePortal && ['training', 'arcade', 'battleship', 'quests'].includes(activePortal)) {
+             onInteract?.(activePortal);
+         }
+         if ((k === '1' || k === '2') && !e.repeat && localAvatar) {
+diff -ruN '--exclude=node_modules' '--exclude=dist' '--exclude=.DS_Store' '--exclude=package-lock.json' '--exclude=characters.json' original/repo/server/README.md repo/server/README.md
+--- original/repo/server/README.md	2026-08-20 21:09:58.000000000 +0000
++++ repo/server/README.md	2026-09-22 08:14:35.452827979 +0000
+@@ -55,7 +55,25 @@
+ ## Protocol
+
+ WebSocket messages are `{ type, payload }` JSON. See `src/index.js` for the
+-full list of message types (`hello`, `move`, `enter_solo`, `solo_action`,
+-`forge`, `create_room`, `join_room`, `room_attack`, `claim_reward`, `chat`)
++full list of message types (`hello`, `move`, `enter_solo`, `enter_training`, `solo_action`,
++`forge`, `customize`, `create_room`, `join_room`, `leave_room`, `room_attack`, `claim_reward`,
++`accept_quest`, `abandon_quest`, `turn_in_quest`, `chat`, `emote`)
+ and what the server broadcasts back (`welcome`, `world_state`, `solo_state`,
+-`character_state`, `room_state`, `chat`, `error`).
++`character_state`, `room_state`, `quest_state`, `chat`, `emote`, `error`).
++
++## Quests
++
++`src/quests.js` is a self-contained module — quest definitions, per-character
++state (`character.quests = { active, completed }`), and the accept / progress /
++turn-in logic all live there, independent of everything else. Add a new quest
++by appending an entry to the `QUESTS` array (`type` is one of `kill`,
++`training_win`, `forge`, `boss`, `level`; set `filter` to a monster name to
++scope a `kill` quest to one enemy; set `requires` to an array of prerequisite
++quest ids; set `repeatable: true` for a standing bounty).
++
++Gameplay events that feed the quest engine are called out explicitly in
++`src/index.js` via `applyQuestProgress(...)` — search for that name to see
++every hook point (defeating an enemy, winning a training bout, buying a Forge
++upgrade, downing an instance boss, leveling up). Characters saved before this
++system existed are migrated automatically and losslessly the next time they
++connect (`ensureQuestState` in `quests.js`, called from the `hello` handler).
+diff -ruN '--exclude=node_modules' '--exclude=dist' '--exclude=.DS_Store' '--exclude=package-lock.json' '--exclude=characters.json' original/repo/server/src/data.js repo/server/src/data.js
+--- original/repo/server/src/data.js	2026-08-20 21:09:58.000000000 +0000
++++ repo/server/src/data.js	2026-09-22 08:01:35.913530705 +0000
+@@ -1,3 +1,5 @@
++import { initQuestState } from './quests.js';
++
+ export const CLASSES = {
+   vanguard: { name: 'Vanguard', role: 'Tank / Melee', baseHp: 140, baseAtk: 11, abilityName: 'Bulwark Smash', abilityMult: 2.1 },
+   phasecaller: { name: 'Phasecaller', role: 'Arcane DPS', baseHp: 88, baseAtk: 19, abilityName: 'Rift Bolt', abilityMult: 2.3 },
+@@ -47,6 +49,7 @@
+     abilityCooldown: 0,
+     forgeHpBuys: 0,
+     forgeAtkBuys: 0,
++    quests: initQuestState(),
+   };
+ }
+
+diff -ruN '--exclude=node_modules' '--exclude=dist' '--exclude=.DS_Store' '--exclude=package-lock.json' '--exclude=characters.json' original/repo/server/src/index.js repo/server/src/index.js
+--- original/repo/server/src/index.js	2026-08-20 21:09:58.000000000 +0000
++++ repo/server/src/index.js	2026-09-22 08:02:28.737543900 +0000
+@@ -9,6 +9,7 @@
+
+ import { CLASSES, newCharacter, grantXp, spawnEnemy, rollVariance, randCode } from './data.js';
+ import { loadStore, getCharacter, saveCharacter, leaderboard } from './store.js';
++import { ensureQuestState, getQuestLog, acceptQuest, abandonQuest, turnInQuest, progressQuests } from './quests.js';
+
+ const __dirname = path.dirname(fileURLToPath(import.meta.url));
+ const PORT = process.env.PORT || 8443;
+@@ -28,10 +29,19 @@
+ // Provide SSL_KEY_PATH + SSL_CERT_PATH (and optional SSL_CA_PATH) to serve real TLS.
+ // Falls back to plain HTTP for local development if no certs are configured.
+ function createServer() {
+-  const keyPath = '/infini9/secure/_.infini9.net_private_key.key';
+-  const certPath = '/infini9/secure/infini9.net_ssl_certificate.cer';
++  // Legacy fallback paths kept for this deployment's existing box in case
++  // SSL_KEY_PATH/SSL_CERT_PATH aren't set in the environment.
++  const LEGACY_KEY_PATH = '/infini9/secure/_.infini9.net_private_key.key';
++  const LEGACY_CERT_PATH = '/infini9/secure/infini9.net_ssl_certificate.cer';
++
++  const keyPath = process.env.SSL_KEY_PATH && fs.existsSync(process.env.SSL_KEY_PATH)
++    ? process.env.SSL_KEY_PATH
++    : (fs.existsSync(LEGACY_KEY_PATH) ? LEGACY_KEY_PATH : null);
++  const certPath = process.env.SSL_CERT_PATH && fs.existsSync(process.env.SSL_CERT_PATH)
++    ? process.env.SSL_CERT_PATH
++    : (fs.existsSync(LEGACY_CERT_PATH) ? LEGACY_CERT_PATH : null);
+
+-  if (keyPath && certPath && fs.existsSync(keyPath) && fs.existsSync(certPath)) {
++  if (keyPath && certPath) {
+     const options = {
+       key: fs.readFileSync(keyPath),
+       cert: fs.readFileSync(certPath),
+@@ -77,6 +87,21 @@
+   if (room.log.length > 25) room.log = room.log.slice(-25);
+ }
+
++function sendQuestState(ws, character) {
++  send(ws, 'quest_state', getQuestLog(character));
++}
++
++// Runs a gameplay event through the quest engine and appends "objective
++// ready" notices to the given combat/room log array. Also rolls a 'level'
++// event through in case the event itself caused a level-up.
++function applyQuestProgress(character, eventType, payload, log) {
++  const ready = progressQuests(character, eventType, payload);
++  for (const id of ready) {
++    log?.push({ type: 'system', msg: `Quest objective complete — return to the Quest Board to turn it in.` });
++  }
++  return ready;
++}
++
+ function worldSnapshot() {
+   return [...sockets.values()]
+       .filter((c) => c.character)
+@@ -145,10 +170,12 @@
+           if (!character.sigil) character.sigil = sigil;
+           if (!character.hairColor) character.hairColor = hairColor;
+           if (!character.clothingColor) character.clothingColor = clothingColor;
++          ensureQuestState(character);
+           saveCharacter(character);
+           conn.callsign = callsign;
+           conn.character = character;
+           send(ws, 'welcome', { character, leaderboard: leaderboard() });
++          sendQuestState(ws, character);
+           broadcast('chat', { from: 'network', msg: `${callsign} tuned into Infini9.` }, ws);
+           break;
+         }
+@@ -207,11 +234,14 @@
+               if (conn.training) {
+                 character.hp = conn.trainingStartHp;
+                 log.push({ type: 'system', msg: 'Simulation complete. Live combat telemetry recorded; health restored.' });
++                applyQuestProgress(character, 'training_win', {}, log);
+               } else {
+                 character.shards += enemy.shardReward;
+                 const leveled = grantXp(character, enemy.xpReward);
+                 log.push({ type: 'system', msg: `+${enemy.xpReward} XP, +${enemy.shardReward} shards.` });
+                 if (leveled) log.push({ type: 'system', msg: `Level up! You are now level ${character.level}.` });
++                applyQuestProgress(character, 'kill', { monster: enemy.name }, log);
++                if (leveled) applyQuestProgress(character, 'level', {}, log);
+               }
+               over = true;
+             } else {
+@@ -243,6 +273,7 @@
+           if (over && conn.training) character.hp = conn.trainingStartHp;
+           if (over) saveCharacter(character);
+           send(ws, 'solo_state', { character, enemy, log, over });
++          if (over) sendQuestState(ws, character);
+           break;
+         }
+
+@@ -264,8 +295,10 @@
+             character.atk += 2;
+             character.forgeAtkBuys = (character.forgeAtkBuys || 0) + 1;
+           }
++          applyQuestProgress(character, 'forge', {});
+           saveCharacter(character);
+           send(ws, 'character_state', { character });
++          sendQuestState(ws, character);
+           break;
+         }
+
+@@ -355,11 +388,47 @@
+           const gainedShards = 70 + Math.round(room.bossMaxHp / 4);
+           conn.character.shards += gainedShards;
+           const leveled = grantXp(conn.character, gainedXp);
++          applyQuestProgress(conn.character, 'boss', {});
++          if (leveled) applyQuestProgress(conn.character, 'level', {});
+           saveCharacter(conn.character);
+           room.rewardClaimed[conn.callsign] = true;
+           pushRoomLog(room, 'system', `${conn.callsign} claimed the reward (+${gainedXp} XP, +${gainedShards} shards).`);
+           broadcastRoom(room);
+           send(ws, 'character_state', { character: conn.character, leveled });
++          sendQuestState(ws, conn.character);
++          break;
++        }
++
++        case 'accept_quest': {
++          if (!conn.character) return;
++          const result = acceptQuest(conn.character, String(msg.payload?.questId || ''));
++          if (!result.ok) return send(ws, 'error', { message: result.message });
++          saveCharacter(conn.character);
++          sendQuestState(ws, conn.character);
++          break;
++        }
++
++        case 'abandon_quest': {
++          if (!conn.character) return;
++          const result = abandonQuest(conn.character, String(msg.payload?.questId || ''));
++          if (!result.ok) return send(ws, 'error', { message: result.message });
++          saveCharacter(conn.character);
++          sendQuestState(ws, conn.character);
++          break;
++        }
++
++        case 'turn_in_quest': {
++          if (!conn.character) return;
++          const questId = String(msg.payload?.questId || '');
++          const result = turnInQuest(conn.character, questId);
++          if (!result.ok) return send(ws, 'error', { message: result.message });
++          conn.character.shards += result.rewardShards;
++          const leveled = result.rewardXp > 0 ? grantXp(conn.character, result.rewardXp) : false;
++          if (leveled) applyQuestProgress(conn.character, 'level', {});
++          saveCharacter(conn.character);
++          send(ws, 'character_state', { character: conn.character, leveled });
++          broadcast('chat', { from: 'network', msg: `${conn.callsign} completed "${result.title}" (+${result.rewardXp} XP, +${result.rewardShards} shards).` });
++          sendQuestState(ws, conn.character);
+           break;
+         }
+
+@@ -397,6 +466,6 @@
+ });
+
+ await loadStore();
+-server.listen(8443, '0.0.0.0', () => {
+-  console.log('Server listening on 0.0.0.0:8443');
++server.listen(PORT, '0.0.0.0', () => {
++  console.log(`Server listening on 0.0.0.0:${PORT}`);
+ });
+diff -ruN '--exclude=node_modules' '--exclude=dist' '--exclude=.DS_Store' '--exclude=package-lock.json' '--exclude=characters.json' original/repo/server/src/quests.js repo/server/src/quests.js
+--- original/repo/server/src/quests.js	1970-01-01 00:00:00.000000000 +0000
++++ repo/server/src/quests.js	2026-09-22 08:01:31.785521712 +0000
+@@ -0,0 +1,209 @@
++// Quest engine — self-contained module, mirrors the style of data.js.
++// Character quest state lives at character.quests = { active: { [id]: { progress, startedAt } }, completed: { [id]: count } }.
++// `completed` maps id -> times turned in, so repeatable quests can be told apart from one-shots.
++
++export const QUESTS = [
++  {
++    id: 'first_signal',
++    title: 'First Signal',
++    giver: 'Archivist Kade',
++    description: 'Defeat 3 creatures in the Solo Rift to prove your signal is stable.',
++    type: 'kill',
++    filter: null,
++    target: 3,
++    minLevel: 1,
++    requires: [],
++    rewardXp: 60,
++    rewardShards: 30,
++    repeatable: false,
++  },
++  {
++    id: 'steady_hand',
++    title: 'Steady Hand',
++    giver: 'Archivist Kade',
++    description: 'Clear a bout in the Combat Simulator without losing your footing.',
++    type: 'training_win',
++    filter: null,
++    target: 1,
++    minLevel: 1,
++    requires: [],
++    rewardXp: 40,
++    rewardShards: 15,
++    repeatable: false,
++  },
++  {
++    id: 'forge_adept',
++    title: 'Forge Adept',
++    giver: 'Archivist Kade',
++    description: 'Purchase 3 permanent upgrades at the Forge.',
++    type: 'forge',
++    filter: null,
++    target: 3,
++    minLevel: 1,
++    requires: [],
++    rewardXp: 70,
++    rewardShards: 40,
++    repeatable: false,
++  },
++  {
++    id: 'hound_hunter',
++    title: 'Hound Hunter',
++    giver: 'Archivist Kade',
++    description: 'Thin the Glitch Hound packs bleeding through the fracture — defeat 5.',
++    type: 'kill',
++    filter: 'Glitch Hound',
++    target: 5,
++    minLevel: 2,
++    requires: ['first_signal'],
++    rewardXp: 110,
++    rewardShards: 55,
++    repeatable: false,
++  },
++  {
++    id: 'rising_wayfinder',
++    title: 'Rising Wayfinder',
++    giver: 'Archivist Kade',
++    description: 'Reach level 5. Growth is its own signal.',
++    type: 'level',
++    filter: null,
++    target: 5,
++    minLevel: 1,
++    requires: [],
++    rewardXp: 0,
++    rewardShards: 90,
++    repeatable: false,
++  },
++  {
++    id: 'warden_challenger',
++    title: 'Warden Challenger',
++    giver: 'Archivist Kade',
++    description: 'Join a Wayfinder crew and bring down the Nine-Eyed Warden.',
++    type: 'boss',
++    filter: null,
++    target: 1,
++    minLevel: 3,
++    requires: [],
++    rewardXp: 220,
++    rewardShards: 120,
++    repeatable: false,
++  },
++  {
++    id: 'null_serpent_cull',
++    title: 'Null Serpent Cull',
++    giver: 'Archivist Kade',
++    description: 'Null Serpents are learning the rift too fast. Defeat 4.',
++    type: 'kill',
++    filter: 'Null Serpent',
++    target: 4,
++    minLevel: 4,
++    requires: ['hound_hunter'],
++    rewardXp: 150,
++    rewardShards: 75,
++    repeatable: false,
++  },
++  {
++    id: 'rift_sweep',
++    title: 'Rift Sweep',
++    giver: 'Archivist Kade',
++    description: 'Standing bounty: defeat 8 creatures in the Solo Rift. Resets on turn-in.',
++    type: 'kill',
++    filter: null,
++    target: 8,
++    minLevel: 1,
++    requires: ['first_signal'],
++    rewardXp: 100,
++    rewardShards: 60,
++    repeatable: true,
++  },
++];
++
++const BY_ID = Object.fromEntries(QUESTS.map((q) => [q.id, q]));
++
++export function initQuestState() {
++  return { active: {}, completed: {} };
++}
++
++// Adds a fresh quests block to older saved characters that predate this system.
++export function ensureQuestState(character) {
++  if (!character.quests || typeof character.quests !== 'object') {
++    character.quests = initQuestState();
++  }
++  if (!character.quests.active) character.quests.active = {};
++  if (!character.quests.completed) character.quests.completed = {};
++}
++
++function isCompleted(character, id) {
++  return !!character.quests.completed[id];
++}
++
++export function isAvailable(character, quest) {
++  if (character.quests.active[quest.id]) return false;
++  if (isCompleted(character, quest.id) && !quest.repeatable) return false;
++  if ((character.level || 1) < quest.minLevel) return false;
++  return quest.requires.every((reqId) => isCompleted(character, reqId));
++}
++
++export function getQuestLog(character) {
++  ensureQuestState(character);
++  const available = QUESTS.filter((q) => isAvailable(character, q)).map((q) => ({ ...q }));
++  const active = Object.entries(character.quests.active).map(([id, state]) => ({
++    ...BY_ID[id],
++    progress: state.progress,
++    readyToTurnIn: state.progress >= BY_ID[id].target,
++  }));
++  const completed = Object.entries(character.quests.completed).map(([id, count]) => ({
++    id,
++    title: BY_ID[id]?.title || id,
++    count,
++  }));
++  return { available, active, completed };
++}
++
++export function acceptQuest(character, questId) {
++  ensureQuestState(character);
++  const quest = BY_ID[questId];
++  if (!quest) return { ok: false, message: 'Unknown quest.' };
++  if (!isAvailable(character, quest)) return { ok: false, message: 'That quest is not available to you right now.' };
++  character.quests.active[questId] = { progress: 0, startedAt: Date.now() };
++  return { ok: true };
++}
++
++export function abandonQuest(character, questId) {
++  ensureQuestState(character);
++  if (!character.quests.active[questId]) return { ok: false, message: 'Quest is not active.' };
++  delete character.quests.active[questId];
++  return { ok: true };
++}
++
++// Called on gameplay events. eventType: 'kill' | 'training_win' | 'forge' | 'boss' | 'level'.
++// Returns the list of quest ids whose objective just became ready to turn in.
++export function progressQuests(character, eventType, payload = {}) {
++  ensureQuestState(character);
++  const justReady = [];
++  for (const [id, state] of Object.entries(character.quests.active)) {
++    const quest = BY_ID[id];
++    if (!quest || quest.type !== eventType) continue;
++    if (quest.filter && payload.monster !== quest.filter) continue;
++    const wasReady = state.progress >= quest.target;
++    if (eventType === 'level') {
++      state.progress = Math.max(state.progress, Math.min(character.level, quest.target));
++    } else {
++      state.progress = Math.min(quest.target, state.progress + 1);
++    }
++    if (!wasReady && state.progress >= quest.target) justReady.push(id);
++  }
++  return justReady;
++}
++
++// Grants rewards, moves the quest to `completed`, clears it from `active`.
++// Returns { ok, rewardXp, rewardShards } — caller is responsible for calling grantXp.
++export function turnInQuest(character, questId) {
++  ensureQuestState(character);
++  const quest = BY_ID[questId];
++  const state = character.quests.active[questId];
++  if (!quest || !state) return { ok: false, message: 'Quest is not active.' };
++  if (state.progress < quest.target) return { ok: false, message: 'Objective is not complete yet.' };
++  delete character.quests.active[questId];
++  character.quests.completed[questId] = (character.quests.completed[questId] || 0) + 1;
++  return { ok: true, rewardXp: quest.rewardXp, rewardShards: quest.rewardShards, title: quest.title };
++}
